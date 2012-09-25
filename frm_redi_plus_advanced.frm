@@ -4,7 +4,7 @@ Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} frm_redi_plus_advanced
    ClientHeight    =   5010
    ClientLeft      =   45
    ClientTop       =   330
-   ClientWidth     =   14790
+   ClientWidth     =   17400
    OleObjectBlob   =   "frm_redi_plus_advanced.frx":0000
    StartUpPosition =   1  'CenterOwner
 End
@@ -13,6 +13,8 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
+
 
 
 
@@ -54,9 +56,24 @@ Private Const minute_timebase_intraday As Integer = 15
 Private Const dim_r_plus_trades_symbol As Integer = 0
 Private Const dim_r_plus_trades_qty As Integer = 1
 Private Const dim_r_plus_trades_price As Integer = 2
+Private Const dim_r_plus_trades_stop As Integer = 3
+Private Const dim_r_plus_trades_group_id As Integer = 4
+Private Const dim_r_plus_trades_json_tag As Integer = 5
+
 
 Public mode_emsx As Integer
 
+Public ControlLastPrice As Control
+
+
+
+Private Sub update_last_control_price()
+
+If ControlLastPrice Is Nothing Then
+    Set ControlLastPrice = TB_custom_price
+End If
+
+End Sub
 
 
 
@@ -505,6 +522,8 @@ End Sub
 
 Private Sub btn_append_to_csv_Click()
 
+Dim oJSON As New JSONLib
+
 Dim debug_test As Variant
 
 Dim emsx_csv_filename As String
@@ -523,38 +542,86 @@ Dim wholeLine  As String
 Dim vec_trade() As Variant
 Dim vec_trades_emsx() As Variant
 
+Dim tmp_side As String, tmp_opposite_side As String
+
+Dim vec_trade_moulinette() As Variant
+
+Dim tmp_group_id As Double
+Dim tmp_qty As Double
+
 k = 0
-If CB_Order_Side.Value <> "" And TB_order_qty.Value <> "" And IsNumeric(TB_order_qty.Value) And TB_order_ticker.Value <> "" And Right(UCase(TB_order_ticker.Value), 6) = "EQUITY" And TB_custom_price.Value <> "" And IsNumeric(TB_custom_price.Value) And CB_exec_broker.Value <> "" And CB_aim_strategy.Value <> "" Then
+'If CB_Order_Side.Value <> "" And TB_order_qty.Value <> "" And IsNumeric(TB_order_qty.Value) And TB_order_ticker.Value <> "" And Right(UCase(TB_order_ticker.Value), 6) = "EQUITY" And TB_custom_price.Value <> "" And IsNumeric(TB_custom_price.Value) And CB_exec_broker.Value <> "" And CB_aim_strategy.Value <> "" Then
+If CB_Order_Side.Value <> "" And TB_order_qty.Value <> "" And IsNumeric(TB_order_qty.Value) And TB_order_ticker.Value <> "" And Right(UCase(TB_order_ticker.Value), 6) = "EQUITY" And CB_exec_broker.Value <> "" And CB_aim_strategy.Value <> "" Then
     
+    
+    tmp_group_id = generate_group_id_trade
     
     If CB_Order_Side.Value = "BUY" Then
         tmp_side = "B"
+        tmp_opposite_side = "H"
+        tmp_qty = Abs(CDbl(TB_order_qty.Value))
     ElseIf CB_Order_Side.Value = "SELL" Then
         tmp_side = "H" 'check si deja long
+        tmp_opposite_side = "B"
+        tmp_qty = -Abs(CDbl(TB_order_qty.Value))
     End If
     
     
-    vec_trade = Array(UCase(TB_order_ticker.Value), default_aim_account, CB_aim_strategy.Value, "LMT", tmp_side, CDbl(TB_order_qty.Value), CDbl(TB_custom_price.Value), "DAY", CB_exec_broker.Value)
+    If TB_custom_price.Value <> "" And IsNumeric(TB_custom_price.Value) Then
+        ReDim Preserve vec_trade(k)
+        ReDim Preserve vec_trade_moulinette(k)
+        vec_trade(k) = Array(UCase(TB_order_ticker.Value), default_aim_account, CB_aim_strategy.Value, "LMT", tmp_side, Abs(CDbl(TB_order_qty.Value)), CDbl(TB_custom_price.Value), "DAY", CB_exec_broker.Value)
+        vec_trade_moulinette(k) = Array(UCase(TB_order_ticker.Value), tmp_qty, CDbl(TB_custom_price.Value), Empty, tmp_group_id, oJSON.toString(Array("EMSX", "base", CB_exec_broker.Value)))
+        
+        k = k + 1
+    End If
     
     
-    If mode_emsx = 0 Then
-        vec_trades_emsx = Array(vec_trade)
-        'new file
-        debug_test = array_to_csv(vec_trades_emsx, base_path & emsx_csv_filename)
-    Else
-        'append
-        'mount le contenu actuel
-        Dim already_in_csv() As Variant
-        already_in_csv = csv_to_array(base_path & emsx_csv_filename)
+    If TB_custom_stop.Value <> "" And IsNumeric(TB_custom_stop.Value) Then
+        ReDim Preserve vec_trade(k)
+        ReDim Preserve vec_trade_moulinette(k)
+        vec_trade(k) = Array(UCase(TB_order_ticker.Value), default_aim_account, CB_aim_strategy.Value, "ST", tmp_opposite_side, Abs(CDbl(TB_order_qty.Value)), Empty, "DAY", CB_exec_broker.Value, Empty, CDbl(TB_custom_stop.Value))
+        vec_trade_moulinette(k) = Array(UCase(TB_order_ticker.Value), -tmp_qty, CDbl(TB_custom_stop.Value), CDbl(TB_custom_stop.Value), tmp_group_id, oJSON.toString(Array("EMSX", "stop", CB_exec_broker.Value)))
         
-        ReDim Preserve already_in_csv(UBound(already_in_csv, 1) + 1)
-        already_in_csv(UBound(already_in_csv, 1)) = vec_trade
+        k = k + 1
+    End If
+    
+    
+    If TB_custom_target.Value <> "" And IsNumeric(TB_custom_target.Value) Then
+        ReDim Preserve vec_trade(k)
+        ReDim Preserve vec_trade_moulinette(k)
+        vec_trade(k) = Array(UCase(TB_order_ticker.Value), default_aim_account, CB_aim_strategy.Value, "LMT", tmp_opposite_side, Abs(CDbl(TB_order_qty.Value)), CDbl(TB_custom_target.Value), "DAY", CB_exec_broker.Value)
+        vec_trade_moulinette(k) = Array(UCase(TB_order_ticker.Value), -tmp_qty, CDbl(TB_custom_target.Value), Empty, tmp_group_id, oJSON.toString(Array("EMSX", "target", CB_exec_broker.Value)))
         
-        debug_test = array_to_csv(already_in_csv, base_path & emsx_csv_filename)
+        k = k + 1
+    End If
+    
+    
+    If k > 0 Then
+        If mode_emsx = 0 Then
+            'new file
+            debug_test = array_to_csv(vec_trade, base_path & emsx_csv_filename)
+        Else
+            'append
+            'mount le contenu actuel
+            Dim already_in_csv() As Variant
+            already_in_csv = csv_to_array(base_path & emsx_csv_filename)
+            
+            For i = 0 To UBound(vec_trade, 1)
+                ReDim Preserve already_in_csv(UBound(already_in_csv, 1) + 1)
+                already_in_csv(UBound(already_in_csv, 1)) = vec_trade(i)
+            Next i
+            
+            debug_test = array_to_csv(already_in_csv, base_path & emsx_csv_filename)
+        End If
+        
+        mode_emsx = 1
+        
+        
+        Call moulinette_inject_EMSX_csv_into_xls_trades(vec_trade_moulinette)
         
     End If
     
-    mode_emsx = 1
     
 Else
     MsgBox ("missing field(s)")
@@ -580,6 +647,9 @@ CB_Order_Side.Value = ""
 TB_order_qty.Value = ""
 TB_order_ticker.Value = ""
 TB_custom_price.Value = ""
+TB_custom_stop.Value = ""
+TB_custom_target.Value = ""
+
 
 CB_exec_broker.Value = "NEGOCE"
 CB_aim_strategy.Value = "GROWTH STOCK"
@@ -818,25 +888,71 @@ End Function
 
 Private Sub btn_trade_it_with_redi_plus_Click()
 
+Dim k As Integer
+
 Dim vec_trades() As Variant
 
-If check_side And check_qty And check_ticker And check_price Then
+Dim tmp_group_id As Double
+k = 0
+If check_side And check_qty And check_ticker Then ' And check_price Then
     
-    ReDim Preserve vec_trades(0)
-    vec_trades(0) = Array("", 0, 0)
+    tmp_group_id = generate_group_id_trade
     
-    vec_trades(0)(dim_r_plus_trades_symbol) = UCase(TB_order_ticker.Value)
-    vec_trades(0)(dim_r_plus_trades_qty) = CDbl(TB_order_qty.Value)
-    vec_trades(0)(dim_r_plus_trades_price) = CDbl(TB_custom_price.Value)
+    If TB_custom_price.Value <> "" And IsNumeric(TB_custom_price.Value) Then
+        ReDim Preserve vec_trades(k)
+        vec_trades(k) = Array("", 0, 0, Empty, tmp_group_id)
+        
+        vec_trades(k)(dim_r_plus_trades_symbol) = UCase(TB_order_ticker.Value)
+        vec_trades(k)(dim_r_plus_trades_qty) = CDbl(TB_order_qty.Value)
+        vec_trades(k)(dim_r_plus_trades_price) = CDbl(TB_custom_price.Value)
+        k = k + 1
+    End If
+    
+    
+    If TB_custom_stop.Value <> "" And IsNumeric(TB_custom_stop.Value) Then  'supporte uniquement par le us pour l instant
+        
+        If InStr(UCase(TB_order_ticker.Value), " US ") <> 0 Then
+            ReDim Preserve vec_trades(k)
+            vec_trades(k) = Array("", 0, 0, Empty, tmp_group_id)
+            
+            vec_trades(k)(dim_r_plus_trades_symbol) = UCase(TB_order_ticker.Value)
+            vec_trades(k)(dim_r_plus_trades_qty) = -CDbl(TB_order_qty.Value)
+            vec_trades(k)(dim_r_plus_trades_price) = CDbl(TB_custom_stop.Value)
+            vec_trades(k)(dim_r_plus_trades_stop) = CDbl(TB_custom_stop.Value)
+            k = k + 1
+        Else
+            MsgBox ("stop not supported in european market. ->Skip")
+        End If
+    End If
+    
+    
+    If TB_custom_target.Value <> "" And IsNumeric(TB_custom_target.Value) Then
+        ReDim Preserve vec_trades(k)
+        vec_trades(k) = Array("", 0, 0, Empty, tmp_group_id)
+        
+        vec_trades(k)(dim_r_plus_trades_symbol) = UCase(TB_order_ticker.Value)
+        vec_trades(k)(dim_r_plus_trades_qty) = -CDbl(TB_order_qty.Value)
+        vec_trades(k)(dim_r_plus_trades_price) = CDbl(TB_custom_target.Value)
+        k = k + 1
+    End If
+    
+    
     
     Dim exec_orders As Variant
-    exec_orders = universal_trades_r_plus(vec_trades)
+    If k > 0 Then
+        exec_orders = universal_trades_r_plus(vec_trades)
+    Else
+        MsgBox ("no trade")
+        Exit Sub
+    End If
 End If
 
 End Sub
 
 
 Private Sub CB_aim_strategy_Change()
+
+Me.Repaint
 
 End Sub
 
@@ -858,6 +974,8 @@ End If
 End Sub
 
 Private Sub CB_exec_broker_Change()
+
+Me.Repaint
 
 End Sub
 
@@ -888,6 +1006,8 @@ If CB_Order_Side.Value <> "" And (UCase(CB_Order_Side.Value) = "SELL" Or UCase(C
 Else
     CB_Order_Side.Value = ""
 End If
+
+Me.Repaint
 
 End Sub
 
@@ -1467,6 +1587,12 @@ End With
 
 End Sub
 
+Private Sub TB_custom_price_Enter()
+
+Set ControlLastPrice = TB_custom_price
+
+End Sub
+
 Private Sub TB_custom_price_Exit(ByVal Cancel As msforms.ReturnBoolean)
 
 'passe en revue les différents prix des tggle btn
@@ -1506,6 +1632,56 @@ With TB_custom_price
     End If
 End With
 
+Me.Repaint
+
+End Sub
+
+Private Sub TB_custom_stop_Change()
+
+End Sub
+
+Private Sub TB_custom_stop_Enter()
+
+Set ControlLastPrice = TB_custom_stop
+
+End Sub
+
+Private Sub TB_custom_stop_MouseDown(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+
+With TB_custom_stop
+    If .Value <> "" Then
+        .SetFocus
+        .SelStart = 0
+        .SelLength = Len(.Value)
+    End If
+End With
+
+Me.Repaint
+
+End Sub
+
+Private Sub TB_custom_target_Change()
+
+End Sub
+
+Private Sub TB_custom_target_Enter()
+
+Set ControlLastPrice = TB_custom_target
+
+End Sub
+
+Private Sub TB_custom_target_MouseDown(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+
+With TB_custom_target
+    If .Value <> "" Then
+        .SetFocus
+        .SelStart = 0
+        .SelLength = Len(.Value)
+    End If
+End With
+
+Me.Repaint
+
 End Sub
 
 Private Sub TB_order_qty_Change()
@@ -1522,6 +1698,8 @@ If IsNumeric(TB_order_qty.Value) And TB_order_qty.Value <> "" Then
         End If
     End If
 End If
+
+Me.Repaint
 
 End Sub
 
@@ -1904,6 +2082,17 @@ If UCase(Right(TB_order_ticker.Value, 6)) = "EQUITY" Or UCase(Right(TB_order_tic
     TgglBtn_position_delta.Caption = delta
     
     
+    
+'    L_limit_price.Caption = "LIMIT"
+'    TB_custom_price.Value = ""
+'    L_limit_stop.Caption = "STOP"
+'    TB_custom_stop.Value = ""
+'    L_limit_target.Caption = "TARGET"
+'    TB_custom_target.Value = ""
+    
+    TB_order_qty.Value = ""
+    
+    
     Me.Caption = form_caption_base
 Else
     Call clear_market_datas
@@ -1935,6 +2124,12 @@ Private Sub TB_order_ticker_Change()
 
 'TB_order_ticker.value = UCase(TB_order_ticker.value) 'evite de recharger 10x les données API
 'Call load_ticker_datas
+L_limit_price.Caption = "LIMIT"
+TB_custom_price.Value = ""
+L_limit_stop.Caption = "STOP"
+TB_custom_stop.Value = ""
+L_limit_target.Caption = "TARGET"
+TB_custom_target.Value = ""
 
 End Sub
 
@@ -2091,6 +2286,8 @@ End Sub
 
 Private Sub TgglBtn_Price_Ask_Click()
 
+Call update_last_control_price
+
 Dim tmp_control As Control
 
 With TgglBtn_Price_Ask
@@ -2102,12 +2299,20 @@ With TgglBtn_Price_Ask
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2117,11 +2322,14 @@ With TgglBtn_Price_Ask
     End If
 End With
 
+Me.Repaint
 
 End Sub
 
 
 Private Sub TgglBtn_Price_Bid_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2134,12 +2342,20 @@ With TgglBtn_Price_Bid
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2148,6 +2364,8 @@ With TgglBtn_Price_Bid
         .Value = False
     End If
 End With
+
+Me.Repaint
 
 End Sub
 
@@ -2185,6 +2403,8 @@ End Sub
 
 Private Sub TgglBtn_Price_High_Click()
 
+Call update_last_control_price
+
 Dim tmp_control As Control
 
 With TgglBtn_Price_High
@@ -2196,12 +2416,20 @@ With TgglBtn_Price_High
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2211,11 +2439,14 @@ With TgglBtn_Price_High
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_Last_Click()
 
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2228,12 +2459,20 @@ With TgglBtn_Price_Last
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2243,10 +2482,14 @@ With TgglBtn_Price_Last
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_Low_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2259,12 +2502,20 @@ With TgglBtn_Price_Low
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2274,10 +2525,14 @@ With TgglBtn_Price_Low
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_MAVG200D_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2290,12 +2545,20 @@ With TgglBtn_Price_MAVG200D
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2305,10 +2568,14 @@ With TgglBtn_Price_MAVG200D
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_MAVG20D_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2321,12 +2588,20 @@ With TgglBtn_Price_MAVG20D
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2336,10 +2611,14 @@ With TgglBtn_Price_MAVG20D
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_MAVG100D_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2352,12 +2631,20 @@ With TgglBtn_Price_MAVG100D
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2366,6 +2653,8 @@ With TgglBtn_Price_MAVG100D
         .Value = False
     End If
 End With
+
+Me.Repaint
 
 End Sub
 
@@ -2418,6 +2707,8 @@ End Sub
 
 Private Sub TgglBtn_Price_PP_Click()
 
+Call update_last_control_price
+
 Dim tmp_control As Control
 
 With TgglBtn_Price_PP
@@ -2429,12 +2720,20 @@ With TgglBtn_Price_PP
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2444,10 +2743,14 @@ With TgglBtn_Price_PP
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_R1_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2460,12 +2763,20 @@ With TgglBtn_Price_R1
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2475,10 +2786,14 @@ With TgglBtn_Price_R1
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_R2_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2491,12 +2806,20 @@ With TgglBtn_Price_R2
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2506,10 +2829,14 @@ With TgglBtn_Price_R2
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_R3_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2522,12 +2849,20 @@ With TgglBtn_Price_R3
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2537,10 +2872,14 @@ With TgglBtn_Price_R3
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_S1_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2553,12 +2892,20 @@ With TgglBtn_Price_S1
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2568,10 +2915,14 @@ With TgglBtn_Price_S1
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_S2_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2584,12 +2935,20 @@ With TgglBtn_Price_S2
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2599,10 +2958,14 @@ With TgglBtn_Price_S2
     End If
 End With
 
+Me.Repaint
+
 End Sub
 
 
 Private Sub TgglBtn_Price_S3_Click()
+
+Call update_last_control_price
 
 Dim tmp_control As Control
 
@@ -2615,12 +2978,20 @@ With TgglBtn_Price_S3
                 End If
             Next
             
-            TB_custom_price.Value = .Caption
+            ControlLastPrice.Value = .Caption
+            Dim tmp_ControlLastPriceLabel As String, tmp_label As String
+            tmp_ControlLastPriceLabel = Replace(ControlLastPrice.name, "TB_custom", "L_Limit")
+            tmp_label = frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption
+            
+            If InStr(tmp_label, " ") <> 0 Then
+                tmp_label = Left(tmp_label, InStr(tmp_label, " ") - 1)
+            End If
+            
             
             'repere le label joint pour rennomer le caption LIMIT
             For Each tmp_control In Me.Controls
                 If TypeOf tmp_control Is msforms.label And tmp_control.name = "L_market_data_" & Replace(.name, "TgglBtn_Price_", "") Then
-                    L_limit_price.Caption = "LIMIT (" & tmp_control.Caption & ")"
+                    frm_redi_plus_advanced.Controls(tmp_ControlLastPriceLabel).Caption = tmp_label & " (" & tmp_control.Caption & ")"
                     Exit For
                 End If
             Next
@@ -2629,6 +3000,8 @@ With TgglBtn_Price_S3
         .Value = False
     End If
 End With
+
+Me.Repaint
 
 End Sub
 
