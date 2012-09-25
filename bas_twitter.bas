@@ -101,9 +101,16 @@ Public Const offline_xml_tag_tweet As String = "tweet"
 
 
 
+
 Public Function twitter_get_db_path() As String
 
-twitter_get_db_path = db_path_base & db_twitter
+If exist_file(db_path_base & db_twitter) Then
+    twitter_get_db_path = db_path_base & db_twitter
+ElseIf exist_file(ThisWorkbook.path & "\" & db_twitter) Then
+    twitter_get_db_path = ThisWorkbook.path & "\" & db_twitter
+Else
+    twitter_get_db_path = ThisWorkbook.path & "\" & db_twitter
+End If
 
 End Function
 
@@ -327,64 +334,64 @@ End Function
 Sub init_db_twitter()
 
 Dim create_db_status As Variant
-create_db_status = sqlite3_create_db(db_path_base & db_twitter)
+create_db_status = sqlite3_create_db(twitter_get_db_path)
 
 
 'creation des tables
 Dim create_table As String
 Dim exec_query_return As Variant
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_user) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_user) = False Then
     create_table = sqlite3_get_query_create_table(t_user, Array(Array(f_user_id, "TEXT", ""), Array(f_user_first_name, "TEXT", ""), Array(f_user_name, "TEXT", ""), Array(f_user_pco_bloomberg, "TEXT", "")), Array(Array(f_user_id, "ASC")))
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
     
     Call init_db_twitter_with_datas
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_tweet) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_tweet) = False Then
     create_table = "CREATE TABLE " & t_tweet & " (" & f_tweet_id & " REAL, " & f_tweet_datetime & " NUMERIC, " & f_tweet_from & " TEXT, " & f_tweet_text & " TEXT, " & f_tweet_json_tickers & " TEXT, " & f_tweet_json_hashtags & " TEXT, " & f_tweet_json_mentions & " TEXT, " & f_tweet_json_links & " TEXT, FOREIGN KEY(" & f_tweet_from & ") REFERENCES " & t_user & " (" & f_user_id & "), PRIMARY KEY(" & f_tweet_id & "))"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_hyperlink_and_file) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_hyperlink_and_file) = False Then
     create_table = "CREATE TABLE " & t_hyperlink_and_file & " (" & f_hyperlink_and_file_tweet_id & " REAL, " & f_hyperlink_and_file_source & " TEXT, " & f_hyerplink_and_file_tinyurl & " TEXT, " & f_hyperlink_and_file_local_copy & " TEXT, FOREIGN KEY(" & f_hyperlink_and_file_tweet_id & ") REFERENCES " & t_tweet & " (" & f_tweet_id & "), PRIMARY KEY(" & f_hyperlink_and_file_tweet_id & ", " & f_hyperlink_and_file_source & "))"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_hashtag) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_hashtag) = False Then
     create_table = sqlite3_get_query_create_table(t_hashtag, Array(Array(f_hashtag_id, "TEXT", "")), Array(Array(f_hashtag_id, "ASC")))
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_category) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_category) = False Then
     create_table = sqlite3_get_query_create_table(t_category, Array(Array(f_category_id, "TEXT", "")), Array(Array(f_category_id, "ASC")))
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_hashtag_category) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_hashtag_category) = False Then
     create_table = "CREATE TABLE " & t_hashtag_category & " (" & f_hashtag_category_hashtag & " TEXT, " & f_hashtag_category_category & " TEXT, FOREIGN KEY (" & f_hashtag_category_hashtag & ") REFERENCES " & t_hashtag & "(" & f_hashtag_id & "), FOREIGN KEY(" & f_hashtag_category_category & ") REFERENCES " & t_category & " (" & f_category_id & "), PRIMARY KEY(" & f_hashtag_category_hashtag & ", " & f_hashtag_category_category & "))"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_ticker) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_ticker) = False Then
     create_table = sqlite3_get_query_create_table(t_ticker, Array(Array(f_ticker_bloomberg, "TEXT", ""), Array(f_ticker_twitter, "TEXT", "")), Array(Array(f_ticker_twitter, "ASC")))
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_mention) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_mention) = False Then
     create_table = "CREATE TABLE " & t_mention & " (" & f_mention_tweet_id & " REAL, " & f_mention_target & " TEXT, FOREIGN KEY (" & f_mention_tweet_id & ") REFERENCES " & t_tweet & "(" & f_tweet_id & "), FOREIGN KEY (" & f_mention_target & ") REFERENCES " & t_user & " (" & f_user_id & ") , PRIMARY KEY(" & f_mention_tweet_id & ", " & f_mention_target & "))"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_market_data) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_market_data) = False Then
     create_table = "CREATE TABLE " & t_market_data & " (" & f_market_data_ticker_twitter & " TEXT, " & f_market_data_datetime & " NUMERIC, " & f_market_data_px_last & " REAL, " & f_market_data_impl_vol & " REAL, " & f_market_data_histo_vol_30d & " REAL, " & f_market_data_central_rank_eps & " REAL)"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
-If sqlite3_check_if_table_already_exist(db_path_base & db_twitter, t_twitter_helper) = False Then
+If sqlite3_check_if_table_already_exist(twitter_get_db_path, t_twitter_helper) = False Then
     create_table = "CREATE TABLE " & t_twitter_helper & " (" & f_twitter_helper_text1 & " TEXT, " & f_twitter_helper_text2 & " TEXT, " & f_twitter_helper_text3 & " TEXT, " & f_twitter_helper_numeric1 & " NUMERIC, " & f_twitter_helper_numeric2 & " NUMERIC, " & f_twitter_helper_numeric3 & " NUMERIC)"
-    exec_query_return = sqlite3_create_tables(db_path_base & db_twitter, Array(create_table))
+    exec_query_return = sqlite3_create_tables(twitter_get_db_path, Array(create_table))
 End If
 
 
@@ -415,7 +422,7 @@ users(k) = Array("@jstouff", "Julien", "Stouff", "x01221179")
 k = k + 1
 
 Dim status_insert_with_transac As Variant
-status_insert_with_transac = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_user, users, Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
+status_insert_with_transac = sqlite3_insert_with_transaction(twitter_get_db_path, t_user, users, Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
 
 End Sub
 
@@ -426,26 +433,26 @@ Dim oJSON As New JSONLib
 Dim col_from_json As Collection
 
 Dim extract_tickers As Variant
-extract_tickers = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_ticker)
+extract_tickers = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_ticker)
 
 Dim extract_users As Variant
-extract_users = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_user)
+extract_users = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_user)
 
 Dim extract_mentions As Variant
-extract_mentions = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_mention)
+extract_mentions = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_mention)
 
 Dim extract_hyperlinks_and_files As Variant
-extract_hyperlinks_and_files = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_hyperlink_and_file)
+extract_hyperlinks_and_files = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_hyperlink_and_file)
 
 Dim extract_hashtags As Variant
-extract_hashtags = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_hashtag)
+extract_hashtags = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_hashtag)
 
 
 
     Dim extract_tweet_t_structure As Variant
-    extract_tweet_t_structure = sqlite3_get_table_structure(db_path_base & db_twitter, t_tweet)
+    extract_tweet_t_structure = sqlite3_get_table_structure(twitter_get_db_path, t_tweet)
 Dim extract_tweets As Variant
-extract_tweets = sqlite3_query(db_path_base & db_twitter, "SELECT * FROM " & t_tweet)
+extract_tweets = sqlite3_query(twitter_get_db_path, "SELECT * FROM " & t_tweet)
 
     If UBound(extract_tweets, 1) > 0 Then
         
@@ -465,7 +472,7 @@ End Sub
 Public Function get_last_tweet_id() As Long
 
 Dim extract_last_tweet As Variant
-extract_last_tweet = sqlite3_query(db_path_base & db_twitter, "SELECT MAX(" & f_tweet_id & ") FROM " & t_tweet)
+extract_last_tweet = sqlite3_query(twitter_get_db_path, "SELECT MAX(" & f_tweet_id & ") FROM " & t_tweet)
 
 If UBound(extract_last_tweet, 1) = 0 Then
     get_last_tweet_id = 0
@@ -550,7 +557,7 @@ Else
     sql_query = mount_query
 End If
 
-t_current_username = sqlite3_query(db_path_base & db_twitter, sql_query)
+t_current_username = sqlite3_query(twitter_get_db_path, sql_query)
 mount_usernames = t_current_username
 
 End Function
@@ -576,7 +583,7 @@ End If
 
 If UBound(t_current_username, 1) = 0 Then
     '1ere entree
-    insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_user, Array(Array(username, first_name, name, pco_bloomberg)), Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
+    insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_user, Array(Array(username, first_name, name, pco_bloomberg)), Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
     mount_usernames_status = mount_usernames
 Else
     's'assure que n'existe pas deja
@@ -585,7 +592,7 @@ Else
             Exit For
         Else
             If i = UBound(t_current_username, 1) Then
-                insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_user, Array(Array(username, first_name, name, pco_bloomberg)), Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
+                insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_user, Array(Array(username, first_name, name, pco_bloomberg)), Array(f_user_id, f_user_first_name, f_user_name, f_user_pco_bloomberg))
                 mount_usernames_status = mount_usernames
             End If
         End If
@@ -604,7 +611,7 @@ Dim extract_users As Variant
 If check_mode = internal_kronos_local_mode.online_with_db Then
 
     sql_query = "SELECT " & f_user_id & ", " & f_user_pco_bloomberg & " FROM " & t_user
-    extract_users = sqlite3_query(db_path_base & db_twitter, sql_query)
+    extract_users = sqlite3_query(twitter_get_db_path, sql_query)
     
     
     If UCase(Trim(Environ("userdomain"))) = "PCO" Then 'au bureau
@@ -735,7 +742,7 @@ Else
     sql_query = mount_query
 End If
 
-t_current_ticker = sqlite3_query(db_path_base & db_twitter, sql_query)
+t_current_ticker = sqlite3_query(twitter_get_db_path, sql_query)
 mount_tickers = t_current_ticker
 
 End Function
@@ -1142,7 +1149,7 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
         End If
     End If
     
-    insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_tweet, Array(Array(tweet_last_entry + 1, tweet_datetime, user, tweet, json_list_tickers, json_list_hashtags, json_list_mentions, json_list_links)), Array(f_tweet_id, f_tweet_datetime, f_tweet_from, f_tweet_text, f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_json_links))
+    insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_tweet, Array(Array(tweet_last_entry + 1, tweet_datetime, user, tweet, json_list_tickers, json_list_hashtags, json_list_mentions, json_list_links)), Array(f_tweet_id, f_tweet_datetime, f_tweet_from, f_tweet_text, f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_json_links))
     
     'si tout c'est bien deroule - attach des files + hyperlinks
     If insert_status = 101 Then
@@ -1227,7 +1234,7 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
             
             Dim check_insert_status_market_data As Variant
             If k > 0 Then
-                check_insert_status_market_data = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_market_data, vec_data_market_data, Array(f_market_data_ticker_twitter, f_market_data_datetime, f_market_data_px_last, f_market_data_impl_vol, f_market_data_histo_vol_30d, f_market_data_central_rank_eps))
+                check_insert_status_market_data = sqlite3_insert_with_transaction(twitter_get_db_path, t_market_data, vec_data_market_data, Array(f_market_data_ticker_twitter, f_market_data_datetime, f_market_data_px_last, f_market_data_impl_vol, f_market_data_histo_vol_30d, f_market_data_central_rank_eps))
             End If
             
             
@@ -1301,7 +1308,7 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
             Next i
             
             If k > 0 Then
-                insert_mentions_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_mention, list_mention_for_export_table_mention, Array(f_mention_tweet_id, f_mention_target))
+                insert_mentions_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_mention, list_mention_for_export_table_mention, Array(f_mention_tweet_id, f_mention_target))
             End If
             
         End If
@@ -1373,7 +1380,7 @@ Else
     sql_query = mount_query
 End If
 
-t_current_hashtag = sqlite3_query(db_path_base & db_twitter, sql_query)
+t_current_hashtag = sqlite3_query(twitter_get_db_path, sql_query)
 mount_hashtags = t_current_hashtag
 
 End Function
@@ -1394,7 +1401,7 @@ End If
 
 If UBound(t_current_hashtag, 1) = 0 Then
     '1ere entree
-    insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_hashtag, Array(Array(UCase(hashtag))), Array(f_hashtag_id))
+    insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_hashtag, Array(Array(UCase(hashtag))), Array(f_hashtag_id))
     mount_hashtags_status = mount_hashtags
 Else
     's'assure que n'existe pas deja
@@ -1403,7 +1410,7 @@ Else
             Exit For
         Else
             If i = UBound(t_current_hashtag, 1) Then
-                insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_hashtag, Array(Array(UCase(hashtag))), Array(f_hashtag_id))
+                insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_hashtag, Array(Array(UCase(hashtag))), Array(f_hashtag_id))
                 mount_hashtags_status = mount_hashtags
             End If
         End If
@@ -1426,7 +1433,7 @@ End If
 
 If UBound(t_current_ticker, 1) = 0 Then
     '1ere entree
-    insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_ticker, Array(Array(UCase(ticker_twitter), UCase(ticker_bloomberg))), Array(f_ticker_twitter, f_ticker_bloomberg))
+    insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_ticker, Array(Array(UCase(ticker_twitter), UCase(ticker_bloomberg))), Array(f_ticker_twitter, f_ticker_bloomberg))
     mount_ticker_status = mount_tickers
 Else
     's'assure que n'existe pas deja
@@ -1447,7 +1454,7 @@ Else
             Exit For
         Else
             If i = UBound(t_current_ticker, 1) Then
-                insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_ticker, Array(Array(UCase(ticker_twitter), UCase(ticker_bloomberg))), Array(f_ticker_twitter, f_ticker_bloomberg))
+                insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_ticker, Array(Array(UCase(ticker_twitter), UCase(ticker_bloomberg))), Array(f_ticker_twitter, f_ticker_bloomberg))
                 mount_ticker_status = mount_tickers
             End If
         End If
@@ -1462,7 +1469,7 @@ End Function
 Public Function create_hyperlink_and_file(ByVal tweet_id As Long, ByVal source_link As String, Optional ByVal tinyurl As Variant = Empty, Optional ByVal local_copy_path As Variant = Empty) As Long
 
 Dim insert_status As Variant
-insert_status = sqlite3_insert_with_transaction(db_path_base & db_twitter, t_hyperlink_and_file, Array(Array(tweet_id, source_link, tinyurl, local_copy_path)), Array(f_hyperlink_and_file_tweet_id, f_hyperlink_and_file_source, f_hyerplink_and_file_tinyurl, f_hyperlink_and_file_local_copy))
+insert_status = sqlite3_insert_with_transaction(twitter_get_db_path, t_hyperlink_and_file, Array(Array(tweet_id, source_link, tinyurl, local_copy_path)), Array(f_hyperlink_and_file_tweet_id, f_hyperlink_and_file_source, f_hyerplink_and_file_tinyurl, f_hyperlink_and_file_local_copy))
 
 End Function
 
@@ -1589,7 +1596,7 @@ Private Function update_tweet(ByVal tweet_id As Variant, ByVal new_text_content 
 Dim sql_query As String
 
 sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_text & "=""" & new_text_content & """ WHERE " & f_tweet_id & "=" & tweet_id
-update_tweet = sqlite3_query(db_path_base & db_twitter, sql_query)
+update_tweet = sqlite3_query(twitter_get_db_path, sql_query)
 
 
 
@@ -1621,7 +1628,7 @@ If IsNumeric(tweet_id_or_tweet) Then
     'remonte le tweet_txt de la base de donnees
     sql_query = "SELECT * FROM " & t_tweet & " WHERE " & f_tweet_id & "=" & CDbl(tweet_id_or_tweet)
     Dim extract_tweet As Variant
-    extract_tweet = sqlite3_query(db_path_base & db_twitter, sql_query)
+    extract_tweet = sqlite3_query(twitter_get_db_path, sql_query)
     
     If UBound(extract_tweet, 1) = 0 Then
         Exit Function
@@ -2262,7 +2269,7 @@ End If
 
 
 Dim extract_tweet As Variant
-extract_tweet = sqlite3_query(db_path_base & db_twitter, sql_query)
+extract_tweet = sqlite3_query(twitter_get_db_path, sql_query)
 
 If UBound(extract_tweet, 1) = 0 Then
     get_specific_tweet_content = Empty
@@ -2474,7 +2481,7 @@ For i = 0 To UBound(content_to_get, 1)
         For n = 0 To UBound(filter_tweet, 1)
             
             If IsEmpty(extract_attachements) Then
-                extract_attachements = sqlite3_query(db_path_base & db_twitter, sql_query)
+                extract_attachements = sqlite3_query(twitter_get_db_path, sql_query)
             End If
             
             Dim vec_attatchements() As Variant
@@ -2606,7 +2613,7 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
     Dim sql_query As String
     sql_query = "SELECT * FROM " & t_tweet & " ORDER BY " & f_tweet_datetime & " DESC LIMIT " & nbre
     Dim extract_tweets As Variant
-    extract_tweets = sqlite3_query(db_path_base & db_twitter, sql_query)
+    extract_tweets = sqlite3_query(twitter_get_db_path, sql_query)
     
     
     'extract les attachements
@@ -2616,7 +2623,7 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
         sql_query = sql_query & " ORDER BY " & f_hyperlink_and_file_tweet_id & " ASC"
     
     Dim extract_tweets_hyperlinks_and_file As Variant
-    extract_tweets_hyperlinks_and_file = sqlite3_query(db_path_base & db_twitter, sql_query)
+    extract_tweets_hyperlinks_and_file = sqlite3_query(twitter_get_db_path, sql_query)
     
     
     
@@ -2894,7 +2901,7 @@ sql_query = "SELECT " & f_tweet_id & ", " & f_tweet_datetime & ", " & f_tweet_fr
     sql_query = sql_query & " ORDER BY " & f_tweet_datetime & " DESC"
 
 Dim extract_tweets As Variant
-extract_tweets = sqlite3_query(db_path_base & db_twitter, sql_query)
+extract_tweets = sqlite3_query(twitter_get_db_path, sql_query)
 
 
     'detection des dim
@@ -3422,7 +3429,7 @@ Dim date_dbl As Double
 
 Dim extract_tweet As Variant
 sql_query = "SELECT * FROM " & t_tweet & " WHERE " & f_tweet_id & "=" & tweet_id
-extract_tweet = sqlite3_query(db_path_base & db_twitter, sql_query)
+extract_tweet = sqlite3_query(twitter_get_db_path, sql_query)
 
 Dim tmp_tweet As String
 
@@ -3446,7 +3453,7 @@ If UBound(extract_tweet) > 0 Then
     If IsNull(extract_tweet(1)(dim_tweet_json_tickers)) = False Then
         sql_query = "SELECT * FROM " & t_market_data & " WHERE " & f_market_data_datetime & ">=" & extract_tweet(1)(dim_tweet_datetime) - 0.0000001 & " AND " & f_market_data_datetime & "<=" & extract_tweet(1)(dim_tweet_datetime) + 0.0000001
         Dim extract_market_data As Variant
-        extract_market_data = sqlite3_query(db_path_base & db_twitter, sql_query)
+        extract_market_data = sqlite3_query(twitter_get_db_path, sql_query)
         
         If UBound(extract_market_data, 1) > 0 Then
         'detection des dim
@@ -3541,29 +3548,29 @@ Dim exec_query As Variant
 Dim date_tmp As Date
 
 sql_query = "SELECT * FROM " & t_market_data
-extract_market_data = sqlite3_query(db_path_base & db_twitter, sql_query)
+extract_market_data = sqlite3_query(twitter_get_db_path, sql_query)
 
 
 sql_query = "SELECT * FROM " & t_tweet & " ORDER BY " & f_tweet_id & " DESC"
-extract_tweeets = sqlite3_query(db_path_base & db_twitter, sql_query)
+extract_tweeets = sqlite3_query(twitter_get_db_path, sql_query)
 
 'sql_query = "DELETE FROM " & t_hyperlink_and_file & " WHERE " & f_hyperlink_and_file_tweet_id & "=89"
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 '
 'sql_query = "DELETE FROM " & t_tweet & " WHERE " & f_tweet_id & "=89"
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 
 'sql_query = "DELETE FROM " & t_hyperlink_and_file & " WHERE " & f_hyperlink_and_file_source & "=""0700.hk"""
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 
 'date_tmp = Now() - 0.08097
 'sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_datetime & "=" & ToJulianDay(date_tmp) & " WHERE " & f_tweet_id & "=39"
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 '
 'sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_from & "=""@jstouff""" & " WHERE " & f_tweet_id & "=39"
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 
 'sql_query = "UPDATE " & t_hyperlink_and_file & " SET " & f_hyperlink_and_file_tweet_id & "=39 WHERE " & f_hyperlink_and_file_tweet_id & "=42"
-'exec_query = sqlite3_query(db_path_base & db_twitter, sql_query)
+'exec_query = sqlite3_query(twitter_get_db_path, sql_query)
 
 End Sub

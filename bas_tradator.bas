@@ -782,10 +782,10 @@ Public Sub tradator_insert_qty_price_from_form()
 Dim tmp_order_line As String
 
 Dim tmp_side As String, tmp_qty As Double, tmp_symbol As String, tmp_price As Double
-'If frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value <> "" Then
+If frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value <> "" And UCase(ActiveWorkbook.name) = UCase("Tradator.xls") And ActiveSheet.name = "portfolio live" Then
+
     
     tmp_order_line = frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value
-    tmp_order_line = "B 10 GOOG 742.23"
     
     tmp_side = Left(Left(tmp_order_line, InStr(tmp_order_line, " ") - 1), 1)
     space_side = InStr(tmp_order_line, " ")
@@ -800,9 +800,20 @@ Dim tmp_side As String, tmp_qty As Double, tmp_symbol As String, tmp_price As Do
     space_price = Len(tmp_order_line)
     tmp_price = CDbl(Mid(tmp_order_line, space_ticker + 1, space_price - space_ticker))
     
-'End If
+    Debug.Print "ok"
+    
+    'insertion des donnees
+    If tmp_side = "B" Then
+        ActiveWorkbook.ActiveSheet.Cells(ActiveCell.row, c_tradator_qty_exec).Value = Abs(tmp_qty)
+    ElseIf tmp_side = "S" Then
+        ActiveWorkbook.ActiveSheet.Cells(ActiveCell.row, c_tradator_qty_exec).Value = -Abs(tmp_qty)
+    End If
+    
+     ActiveWorkbook.ActiveSheet.Cells(ActiveCell.row, c_tradator_trigger).Value = tmp_price
+    
+End If
 
-'frm_Tradator_choose_qty_price.Hide
+frm_Tradator_choose_qty_price.Hide
 
 End Sub
 
@@ -813,14 +824,14 @@ Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer
 
 Dim tmp_ticker As String
 
-If ActiveWorkbook.name = "Tradator.xls" Then
+If UCase(ActiveWorkbook.name) = UCase("Tradator.xls") Then
     If ActiveSheet.name = "portfolio live" Then
         If ActiveCell.row > 9 Then
             
             'remonte le symbol
             tmp_ticker = ActiveWorkbook.ActiveSheet.Cells(ActiveCell.row, c_tradator_ticker).Value
             
-            tmp_ticker = "GOOG Us equity"
+            'tmp_ticker = "GOOG Us equity"
             
             Dim redi_order_from_ticker As Variant
             redi_order_from_ticker = tradator_get_combi_order_qty_price(tmp_ticker)
@@ -878,9 +889,13 @@ End Sub
 Public Function tradator_get_combi_order_qty_price(ByVal ticker As String) As Variant
 
 Dim redi_symbol As String
+'redi_symbol = Replace(UCase(ticker), " EQUITY", "")
+'redi_symbol = Replace(redi_symbol, " ", ".")
+'redi_symbol = Replace(redi_symbol, ".US", "")
 redi_symbol = Replace(UCase(ticker), " EQUITY", "")
-redi_symbol = Replace(redi_symbol, " ", ".")
-redi_symbol = Replace(redi_symbol, ".US", "")
+If InStr(redi_symbol, " ") <> 0 Then
+    redi_symbol = Left(redi_symbol, InStr(redi_symbol, " ") - 1)
+End If
 
 
 
@@ -1024,7 +1039,7 @@ If IsRediReady Then
         k = 0
         Dim vec_combi() As Variant
         For i = 0 To UBound(vec_redi_exec, 1)
-            If vec_redi_exec(i)(6) = redi_symbol Then
+            If UCase(Left(vec_redi_exec(i)(6), Len(redi_symbol))) = UCase(redi_symbol) Then
                 ReDim Preserve vec_combi(k)
                 vec_combi(k) = vec_redi_exec(i)
                 k = k + 1
