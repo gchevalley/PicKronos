@@ -118,7 +118,7 @@ End Function
 Public Function check_mode() As Integer
 
 'si office -> sqlite sinon XML offline
-If exist_file(db_path_base & db_twitter) Then
+If exist_file(twitter_get_db_path) Then
     check_mode = internal_kronos_local_mode.online_with_db
 Else
     check_mode = internal_kronos_local_mode.offline_with_xml
@@ -1180,63 +1180,65 @@ If check_mode = internal_kronos_local_mode.online_with_db Then
             output_bbg = oBBG.bdp(vec_ticker_bbg, Array("PX_LAST", "HIST_PUT_IMP_VOL", "VOLATILITY_30D"), output_format.of_vec_without_header)
             data_central = mount_sqlite_central()
             
-            For i = 1 To UBound(data_central, 1)
-                data_central(i)(0) = UCase(patch_ticker_marketplace(data_central(i)(0)))
-            Next i
+            If IsEmpty(data_central) = False Then
             
-            
-            'insertion with transaction
-            Dim tmp_last_price As Double, tmp_impl_vol As Double, tmp_hist_vol As Double, tmp_central_eps As Double, tmp_ticker As String
-            k = 0
-            Dim vec_data_market_data() As Variant
-            For i = 0 To UBound(output_bbg, 1)
-                If IsNumeric(output_bbg(i)(0)) Then
-                    
-                    tmp_ticker = UCase(patch_ticker_marketplace(vec_ticker_bbg(i)))
-                    
-                    tmp_central_eps = -1
-                    
-                    For j = 1 To UBound(data_central, 1)
-                        If UCase(data_central(j)(0)) = tmp_ticker Then
-                            
-                            For m = 0 To UBound(data_central(0), 1)
-                                If data_central(0)(m) = "Rank_EPS" Then
-                                    tmp_central_eps = data_central(j)(m)
-                                    Exit For
-                                End If
-                            Next m
-                            
-                            Exit For
+                For i = 1 To UBound(data_central, 1)
+                    data_central(i)(0) = UCase(patch_ticker_marketplace(data_central(i)(0)))
+                Next i
+                
+                
+                'insertion with transaction
+                Dim tmp_last_price As Double, tmp_impl_vol As Double, tmp_hist_vol As Double, tmp_central_eps As Double, tmp_ticker As String
+                k = 0
+                Dim vec_data_market_data() As Variant
+                For i = 0 To UBound(output_bbg, 1)
+                    If IsNumeric(output_bbg(i)(0)) Then
+                        
+                        tmp_ticker = UCase(patch_ticker_marketplace(vec_ticker_bbg(i)))
+                        
+                        tmp_central_eps = -1
+                        
+                        For j = 1 To UBound(data_central, 1)
+                            If UCase(data_central(j)(0)) = tmp_ticker Then
+                                
+                                For m = 0 To UBound(data_central(0), 1)
+                                    If data_central(0)(m) = "Rank_EPS" Then
+                                        tmp_central_eps = data_central(j)(m)
+                                        Exit For
+                                    End If
+                                Next m
+                                
+                                Exit For
+                            End If
+                        Next j
+                        
+                        tmp_last_price = output_bbg(i)(0)
+                        
+                        If IsNumeric(output_bbg(i)(1)) Then
+                            tmp_impl_vol = Round(output_bbg(i)(1), 2)
+                        Else
+                            tmp_impl_vol = -1
                         End If
-                    Next j
-                    
-                    tmp_last_price = output_bbg(i)(0)
-                    
-                    If IsNumeric(output_bbg(i)(1)) Then
-                        tmp_impl_vol = Round(output_bbg(i)(1), 2)
-                    Else
-                        tmp_impl_vol = -1
+                        
+                        If IsNumeric(output_bbg(i)(2)) Then
+                            tmp_hist_vol = Round(output_bbg(i)(2), 2)
+                        Else
+                            tmp_hist_vol = -1
+                        End If
+                        
+                        
+                        ReDim Preserve vec_data_market_data(k)
+                        vec_data_market_data(k) = Array(list_tickers(i)(0), tweet_datetime, tmp_last_price, tmp_impl_vol, tmp_hist_vol, tmp_central_eps)
+                        k = k + 1
+                        
                     End If
-                    
-                    If IsNumeric(output_bbg(i)(2)) Then
-                        tmp_hist_vol = Round(output_bbg(i)(2), 2)
-                    Else
-                        tmp_hist_vol = -1
-                    End If
-                    
-                    
-                    ReDim Preserve vec_data_market_data(k)
-                    vec_data_market_data(k) = Array(list_tickers(i)(0), tweet_datetime, tmp_last_price, tmp_impl_vol, tmp_hist_vol, tmp_central_eps)
-                    k = k + 1
-                    
+                Next i
+                
+                Dim check_insert_status_market_data As Variant
+                If k > 0 Then
+                    check_insert_status_market_data = sqlite3_insert_with_transaction(twitter_get_db_path, t_market_data, vec_data_market_data, Array(f_market_data_ticker_twitter, f_market_data_datetime, f_market_data_px_last, f_market_data_impl_vol, f_market_data_histo_vol_30d, f_market_data_central_rank_eps))
                 End If
-            Next i
-            
-            Dim check_insert_status_market_data As Variant
-            If k > 0 Then
-                check_insert_status_market_data = sqlite3_insert_with_transaction(twitter_get_db_path, t_market_data, vec_data_market_data, Array(f_market_data_ticker_twitter, f_market_data_datetime, f_market_data_px_last, f_market_data_impl_vol, f_market_data_histo_vol_30d, f_market_data_central_rank_eps))
             End If
-            
             
             c_open_underlying_id = 1
             c_open_product_id = 2
@@ -1603,6 +1605,72 @@ update_tweet = sqlite3_query(twitter_get_db_path, sql_query)
 End Function
 
 
+Public Function twitter_get_recommendation_from_broker(ByVal bbg_ticker As String, ByVal mention_broker As String) As String
+
+twitter_get_recommendation_from_broker = ""
+
+Dim i As Integer, j As Integer, k As Integer
+Dim date_tmp As Date, today_date As Date
+
+today_date = Date
+
+Dim bbg_broker As String
+bbg_broker = twitter_get_broker_bbg_name_from_mention(mention_broker)
+
+dim_rec_broker = 0
+dim_rec_analyst = 1
+dim_rec_rec_txt = 2
+dim_rec_since_last_change = 4
+dim_rec_target_price = 5
+dim_rec_target_time = 6
+dim_rec_date_rec = 7
+dim_rec_rank_analyst = 8
+dim_rec_1yr_return = 9
+
+
+Dim vec_since_last_change() As Variant
+    vec_since_last_change = Array(Array("U", "Upgraded"), Array("D", "Downgraded"), Array("M", "Maintained"), Array("N", "NewRating"))
+
+
+Dim tmp_since_last_change As String
+If bbg_broker <> "" Then
+
+    Dim oBBG As New cls_Bloomberg_Sync
+    Dim data_bbg As Variant
+    data_bbg = oBBG.bdp(Array(bbg_ticker), Array("BEST_ANALYST_RECS_BULK"), output_format.of_vec_without_header)
+    
+    'passe en revue les entree
+    For i = 0 To UBound(data_bbg(0)(0), 1)
+        
+        If data_bbg(0)(0)(i)(dim_rec_broker) = bbg_broker Then
+            
+            date_tmp = data_bbg(0)(0)(i)(dim_rec_date_rec)
+            
+            If (today_date - date_tmp) <= 7 Then
+                
+                tmp_since_last_change = ""
+                For j = 0 To UBound(vec_since_last_change, 1)
+                    If UCase(vec_since_last_change(j)(0)) = UCase(data_bbg(0)(0)(i)(dim_rec_since_last_change)) Then
+                        tmp_since_last_change = "#" & UCase(vec_since_last_change(j)(1)) & " to "
+                        tmp_since_last_change = vec_since_last_change(j)(1) & " to "
+                        Exit For
+                    End If
+                Next j
+                
+                twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " #ANALYST " & data_bbg(0)(0)(i)(dim_rec_analyst)
+                twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " by " & data_bbg(0)(0)(i)(dim_rec_analyst)
+            End If
+            Exit Function
+        End If
+        
+    Next i
+    
+    'tranforme le mention/hashtag broker en nom
+
+End If
+
+End Function
+
 Public Function tweet_trigger(ByVal tweet_id_or_tweet As Variant) As Variant
 
 Dim sql_query As String
@@ -1657,6 +1725,56 @@ If IsNumeric(tweet_id_or_tweet) Then
 Else
     Exit Function 'a dev
 End If
+
+
+'append reco broker
+test_content = get_specific_tweet_content(Array(f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_text, f_tweet_id), Array("@upgrade"), , , , , tweet_id_or_tweet)
+If IsEmpty(test_content) = False Then
+    
+tweet_trigger_reco:
+    
+    dim_ticker = 0
+    dim_hashtag = 1
+    dim_mention = 2
+    dim_tweet_txt = 3
+    dim_tweet_id = 4
+    
+    tmp_tweet = test_content(dim_tweet_txt)(0)(0)
+    tmp_tweet_id = test_content(dim_tweet_id)(0)(0)
+    
+    tmp_broker = ""
+    If IsNull(test_content(dim_ticker)(0)(0)) = False Then
+        tmp_ticker = get_clean_ticker_bloomberg(test_content(dim_ticker)(0)(0))
+        
+        'boucle pour trouver le broker
+        For Each tmp_mention In test_content(dim_mention)(0)
+            If UCase(tmp_mention) <> UCase("@upgrade") And UCase(tmp_mention) <> UCase("@downgrade") Then
+                tmp_broker = UCase(tmp_mention)
+                Exit For
+            End If
+        Next
+        
+        If tmp_ticker <> "" And tmp_broker <> "" Then
+            
+            tmp_rec = twitter_get_recommendation_from_broker(tmp_ticker, tmp_broker)
+            
+            If tmp_rec <> "" Then
+                'update de row dans la table
+                sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_text & "=""" & tmp_tweet & " " & tmp_rec & """ WHERE " & f_tweet_id & "=" & tmp_tweet_id
+                exec_query = sqlite3_query(twitter_get_db_path, sql_query)
+            End If
+            
+            
+        End If
+        
+    End If
+Else
+    test_content = get_specific_tweet_content(Array(f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_text, f_tweet_id), Array("@downgrade"), , , , , tweet_id_or_tweet)
+    If IsEmpty(test_content) = False Then
+        GoTo tweet_trigger_reco
+    End If
+End If
+
 
 
 'redi plus
@@ -3539,6 +3657,40 @@ End If
 
 End Function
 
+
+
+
+
+Public Function twitter_get_broker_bbg_name_from_mention(ByVal mention_broker As String) As String
+
+mention_broker = UCase(mention_broker)
+mention_broker = Replace(mention_broker, "@", "")
+mention_broker = Replace(mention_broker, "#", "")
+
+Dim i As Integer, j As Integer
+
+
+twitter_get_broker_bbg_name_from_mention = ""
+
+Dim vec_match_table_broker() As Variant
+    vec_match_table_broker = Array(Array("JPMorgan", Array("JPM")), Array("Credit Suisse", Array("CS")), Array("Deutsche Bank", Array("DB", "DBK")), Array("Piper Jaffray", Empty), Array("Morgan Stanley", Array("MS")), Array("Jefferies", Empty), Array("Barclays", Array("BARC", "BARCAP")), Array("BofAML", Array("BOA", "ML", "BOAML")), Array("Goldman Sachs", Array("GS")))
+
+
+For i = 0 To UBound(vec_match_table_broker, 1)
+    If IsEmpty(vec_match_table_broker(i)(1)) Then
+    Else
+        For j = 0 To UBound(vec_match_table_broker(i)(1), 1)
+            If UCase(mention_broker) = UCase(vec_match_table_broker(i)(1)(j)) Then
+                
+                twitter_get_broker_bbg_name_from_mention = vec_match_table_broker(i)(0)
+                Exit Function
+            End If
+        Next j
+    End If
+Next i
+
+
+End Function
 
 
 Private Sub manipulate_db()
