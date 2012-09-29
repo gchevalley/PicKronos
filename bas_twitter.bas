@@ -98,6 +98,15 @@ Public Const offline_xml_tag_tweet As String = "tweet"
     Public Const offline_xml_tag_tweet_from As String = "from"
     Public Const offline_xml_tag_tweet_datetime As String = "datetime"
     Public Const offline_xml_tag_tweet_text As String = "text"
+    
+    
+'Excel version
+Public Enum excel_version
+    excel_unknown = 0
+    excel_2003 = 1
+    excel_2007 = 2
+    excel_2010 = 3
+End Enum
 
 
 
@@ -1605,17 +1614,29 @@ update_tweet = sqlite3_query(twitter_get_db_path, sql_query)
 End Function
 
 
-Public Function twitter_get_recommendation_from_broker(ByVal bbg_ticker As String, ByVal mention_broker As String) As String
+
+Private Sub test_twitter_get_recommendation_from_broker()
+
+debug_test = twitter_get_recommendation_from_broker("AAPL US EQUITY", "Piper Jaffray", True)
+
+End Sub
+
+
+Public Function twitter_get_recommendation_from_broker(ByVal bbg_ticker As String, ByVal mention_broker As String, Optional ByVal override_broker As Boolean = False) As String
 
 twitter_get_recommendation_from_broker = ""
 
 Dim i As Integer, j As Integer, k As Integer
-Dim date_tmp As Date, today_date As Date
+Dim date_tmp As Date, today_date As Date, date_previous_day_rec As Date
 
 today_date = Date
 
 Dim bbg_broker As String
-bbg_broker = twitter_get_broker_bbg_name_from_mention(mention_broker)
+If override_broker = False Then
+    bbg_broker = twitter_get_broker_bbg_name_from_mention(mention_broker)
+Else
+    bbg_broker = mention_broker
+End If
 
 dim_rec_broker = 0
 dim_rec_analyst = 1
@@ -1639,33 +1660,51 @@ If bbg_broker <> "" Then
     Dim data_bbg As Variant
     data_bbg = oBBG.bdp(Array(bbg_ticker), Array("BEST_ANALYST_RECS_BULK"), output_format.of_vec_without_header)
     
-    'passe en revue les entree
-    For i = 0 To UBound(data_bbg(0)(0), 1)
-        
-        If data_bbg(0)(0)(i)(dim_rec_broker) = bbg_broker Then
-            
-            date_tmp = data_bbg(0)(0)(i)(dim_rec_date_rec)
-            
-            If (today_date - date_tmp) <= 7 Then
-                
-                tmp_since_last_change = ""
-                For j = 0 To UBound(vec_since_last_change, 1)
-                    If UCase(vec_since_last_change(j)(0)) = UCase(data_bbg(0)(0)(i)(dim_rec_since_last_change)) Then
-                        tmp_since_last_change = "#" & UCase(vec_since_last_change(j)(1)) & " to "
-                        tmp_since_last_change = vec_since_last_change(j)(1) & " to "
-                        Exit For
-                    End If
-                Next j
-                
-                twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " #ANALYST " & data_bbg(0)(0)(i)(dim_rec_analyst)
-                twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " by " & data_bbg(0)(0)(i)(dim_rec_analyst)
-            End If
-            Exit Function
-        End If
-        
-    Next i
+    date_tmp = data_bbg(0)(0)(i)(dim_rec_date_rec)
+    date_previous_day_rec = date_tmp - 1
     
-    'tranforme le mention/hashtag broker en nom
+        'second appel pour voir l evaluation precedente
+        Dim data_bbg_previous_rec As Variant
+        data_bbg_previous_rec = oBBG.bdp(Array(bbg_ticker), Array("BEST_ANALYST_RECS_BULK"), output_format.of_vec_without_header, Array("END_DATE_OVERRIDE"), Array(CStr(year(date_previous_day_rec)) & Right("0" & CStr(Month(date_previous_day_rec)), 2) & Right("0" & CStr(day(date_previous_day_rec)), 2)))
+    
+    
+    'passe en revue les entree
+    If IsArray(data_bbg(0)(0)) Then
+        For i = 0 To UBound(data_bbg(0)(0), 1)
+            
+            If data_bbg(0)(0)(i)(dim_rec_broker) = bbg_broker Then
+                
+                
+                
+                If (today_date - date_tmp) <= 7 Then
+                    
+                    tmp_since_last_change = ""
+                    For j = 0 To UBound(vec_since_last_change, 1)
+                        If UCase(vec_since_last_change(j)(0)) = UCase(data_bbg(0)(0)(i)(dim_rec_since_last_change)) Then
+                            tmp_since_last_change = "#" & UCase(vec_since_last_change(j)(1)) & " to "
+                            tmp_since_last_change = vec_since_last_change(j)(1) & " to " & data_bbg(0)(0)(i)(dim_rec_rec_txt)
+                            Exit For
+                        End If
+                    Next j
+                    
+                    
+                    If IsArray(data_bbg_previous_rec(0)(0)) Then
+                        For j = 0 To UBound(data_bbg_previous_rec(0)(0), 1)
+                            If data_bbg(0)(0)(i)(dim_rec_rec_txt) <> data_bbg_previous_rec(0)(0)(j)(dim_rec_rec_txt) & data_bbg(0)(0)(i)(dim_rec_analyst) = data_bbg_previous_rec(0)(0)(j)(dim_rec_analyst) And data_bbg(0)(0)(i)(dim_rec_broker) = data_bbg_previous_rec(0)(0)(j)(dim_rec_broker) Then
+                                tmp_since_last_change = tmp_since_last_change & " from " & data_bbg_previous_rec(0)(0)(j)(dim_rec_rec_txt) & " "
+                            End If
+                        Next j
+                    End If
+                    
+                    
+                    twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " #ANALYST " & data_bbg(0)(0)(i)(dim_rec_analyst)
+                    twitter_get_recommendation_from_broker = tmp_since_last_change & " by " & data_bbg(0)(0)(i)(dim_rec_analyst)
+                End If
+                Exit Function
+            End If
+            
+        Next i
+    End If
 
 End If
 
@@ -3688,6 +3727,45 @@ For i = 0 To UBound(vec_match_table_broker, 1)
         Next j
     End If
 Next i
+
+
+End Function
+
+
+Private Sub test_get_excel_version()
+
+Dim debug_test As Variant
+
+debug_test = get_excel_version()
+
+End Sub
+
+Public Function get_excel_version()
+
+Dim debug_test As Variant
+get_excel_version = Application.Version
+
+
+Select Case Application.Version
+    Case "5.0"
+        Ver = "Excel 5"
+    Case "7.0"
+        Ver = "Excel 95"
+    Case "8.0"
+        Ver = "Excel 97"
+    Case "9.0"
+        Ver = "Excel 2000"
+    Case "10.0"
+        Ver = "Excel 2002"
+    Case "11.0"
+        get_excel_version = excel_version.excel_2003
+    Case "12.0"
+        get_excel_version = excel_version.excel_2007
+    Case "14.0"
+        get_excel_version = excel_version.excel_2010
+    Case Else
+        get_excel_version = excel_version.excel_unknown
+End Select
 
 
 End Function

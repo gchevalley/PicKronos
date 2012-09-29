@@ -42,6 +42,22 @@ Public Const c_tradator_central_rank_eps As Integer = 27
 Public Const c_tradator_nav_pnl As Integer = 28
 Public Const c_tradator_avg_pnl As Integer = 29
 
+Public Const c_tdtr_broker_call_ticker_and_date = 2
+Public Const c_tdtr_broker_call_broker = 3
+Public Const c_tdtr_broker_call_side = 4 ' long/short
+Public Const c_tdtr_broker_call_new_rec = 5
+Public Const c_tdtr_broker_call_old_rec = 6
+Public Const c_tdtr_broker_call_target_price = 7
+Public Const c_tdtr_broker_call_comment = 8 'tweet
+Public Const c_tdtr_broker_call_last_price = 9
+Public Const c_tdtr_broker_call_low = 10
+Public Const c_tdtr_broker_call_high = 11
+Public Const c_tdtr_broker_call_open = 12
+Public Const c_tdtr_broker_call_vwap = 13
+Public Const c_tdtr_broker_call_ratio_last_open = 14
+Public Const c_tdtr_broker_call_ratio_last_extrem = 15 ' low if buy / high if sell
+Public Const c_tdtr_broker_call_ratio_last_vwap = 16
+
 
 
 Public Function tradator_get_vec_mention_to_track() As Variant
@@ -1057,3 +1073,14 @@ End If
 End Function
 
 
+Public Sub tradator_insert_daily_update_downgrade()
+
+Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer
+
+'remonte les call du jour
+Dim sql_query As String
+sql_query = "SELECT"
+
+
+
+End Sub
