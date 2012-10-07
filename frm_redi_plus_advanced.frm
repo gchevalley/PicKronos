@@ -19,6 +19,7 @@ Attribute VB_Exposed = False
 
 
 
+
 Private Const book_name As String = "Kronos.xls"
 Private Const sparkline_tmp_file As String = "sparkline_tmp.jpg"
 Private Const tmp_sheet_sparkline As String = "sparkline_tmp_sheet"

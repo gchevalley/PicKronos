@@ -5,7 +5,7 @@ Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} frm_Tweet_new
    ClientLeft      =   45
    ClientTop       =   330
    ClientWidth     =   14550
-   OleObjectBlob   =   "frm_Tweet_new.frx":0000
+   OleObjectBlob   =   "frm_tweet_new.frx":0000
    StartUpPosition =   1  'CenterOwner
 End
 Attribute VB_Name = "frm_Tweet_new"
@@ -13,6 +13,7 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
 
 
 

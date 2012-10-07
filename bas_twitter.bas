@@ -1681,7 +1681,7 @@ If bbg_broker <> "" Then
                     tmp_since_last_change = ""
                     For j = 0 To UBound(vec_since_last_change, 1)
                         If UCase(vec_since_last_change(j)(0)) = UCase(data_bbg(0)(0)(i)(dim_rec_since_last_change)) Then
-                            tmp_since_last_change = "#" & UCase(vec_since_last_change(j)(1)) & " to "
+                            'tmp_since_last_change = "#" & UCase(vec_since_last_change(j)(1)) & " to "
                             tmp_since_last_change = vec_since_last_change(j)(1) & " to " & data_bbg(0)(0)(i)(dim_rec_rec_txt)
                             Exit For
                         End If
@@ -1697,7 +1697,11 @@ If bbg_broker <> "" Then
                     End If
                     
                     
-                    twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " #ANALYST " & data_bbg(0)(0)(i)(dim_rec_analyst)
+                    'twitter_get_recommendation_from_broker = tmp_since_last_change & data_bbg(0)(0)(i)(dim_rec_rec_txt) & " #ANALYST " & data_bbg(0)(0)(i)(dim_rec_analyst)
+                    If IsNumeric(data_bbg(0)(0)(i)(dim_rec_target_price)) Then
+                        tmp_since_last_change = tmp_since_last_change & " #TGT " & data_bbg(0)(0)(i)(dim_rec_target_price)
+                    End If
+                    
                     twitter_get_recommendation_from_broker = tmp_since_last_change & " by " & data_bbg(0)(0)(i)(dim_rec_analyst)
                 End If
                 Exit Function
@@ -1787,7 +1791,7 @@ tweet_trigger_reco:
         
         'boucle pour trouver le broker
         For Each tmp_mention In test_content(dim_mention)(0)
-            If UCase(tmp_mention) <> UCase("@upgrade") And UCase(tmp_mention) <> UCase("@downgrade") Then
+            If UCase(tmp_mention) <> UCase("@upgrade") And UCase(tmp_mention) <> UCase("@downgrade") And UCase(tmp_mention) <> UCase("@ug") And UCase(tmp_mention) <> UCase("@dg") Then
                 tmp_broker = UCase(tmp_mention)
                 Exit For
             End If
@@ -1801,6 +1805,41 @@ tweet_trigger_reco:
                 'update de row dans la table
                 sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_text & "=""" & tmp_tweet & " " & tmp_rec & """ WHERE " & f_tweet_id & "=" & tmp_tweet_id
                 exec_query = sqlite3_query(twitter_get_db_path, sql_query)
+                
+                'update des hashtags si #TGT
+                If InStr(tmp_rec, "#TGT") <> 0 Then
+                    extract_hashtags = sqlite3_query(twitter_get_db_path, "SELECT " & f_tweet_json_hashtags & " FROM " & t_tweet & " WHERE " & f_tweet_id & "=" & tmp_tweet_id)
+                    
+                    Dim vec_tmp_hashtags() As Variant
+                    
+                    If UBound(extract_hashtags, 1) > 0 Then
+                        
+                        k = 0
+                        If IsNull(extract_hashtags(1)(0)) Then
+                        Else
+                            'passe en revue les entree
+                            Set colHashtags = oJSON.parse(decode_json_from_DB(extract_hashtags(1)(0)))
+                            If colHashtags Is Nothing Then
+                            Else
+                                For Each col_tmp_hashtag In colHashtags
+                                    ReDim Preserve vec_tmp_hashtags(k)
+                                    vec_tmp_hashtags(k) = col_tmp_hashtag
+                                    k = k + 1
+                                Next
+                            End If
+                        End If
+                        
+                        ReDim Preserve vec_tmp_hashtags(k)
+                        vec_tmp_hashtags(k) = "#TGT"
+                        k = k + 1
+                        
+                        
+                        sql_query = "UPDATE " & t_tweet & " SET " & f_tweet_json_hashtags & "=""" & encode_json_for_DB(oJSON.toString(vec_tmp_hashtags)) & """ WHERE " & f_tweet_id & "=" & tmp_tweet_id
+                        exec_query = sqlite3_query(twitter_get_db_path, sql_query)
+                        
+                    End If
+                End If
+                
             End If
             
             
@@ -1812,6 +1851,17 @@ Else
     If IsEmpty(test_content) = False Then
         GoTo tweet_trigger_reco
     End If
+    
+    test_content = get_specific_tweet_content(Array(f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_text, f_tweet_id), Array("@ug"), , , , , tweet_id_or_tweet)
+    If IsEmpty(test_content) = False Then
+        GoTo tweet_trigger_reco
+    End If
+    
+    test_content = get_specific_tweet_content(Array(f_tweet_json_tickers, f_tweet_json_hashtags, f_tweet_json_mentions, f_tweet_text, f_tweet_id), Array("@dp"), , , , , tweet_id_or_tweet)
+    If IsEmpty(test_content) = False Then
+        GoTo tweet_trigger_reco
+    End If
+    
 End If
 
 

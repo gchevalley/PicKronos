@@ -133,7 +133,6 @@ Dim sql_query As String
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DELETE FROM " & t_moulinette_order_xls)
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DELETE FROM " & t_moulinette_order_xls & " WHERE " & f_moulinette_order_xls_id & "=""2564""")
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DELETE FROM " & t_moulinette_order_redi)
-'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DROP TABLE " & t_moulinette_order_xls)
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DROP TABLE " & t_moulinette_order_redi)
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DROP TABLE " & t_moulinette_bridge_redi)
 'exec_query = sqlite3_query(moulinette_get_db_complete_path, "DROP TABLE " & t_moulinette_static)
@@ -191,7 +190,7 @@ Dim create_db_status As Variant, create_tbl_status As Variant
 Dim create_table_query As String
 
 If sqlite3_check_if_table_already_exist(moulinette_get_db_complete_path, t_moulinette_order_xls) = False Then
-    create_table_query = sqlite3_get_query_create_table(t_moulinette_order_xls, Array(Array(f_moulinette_order_xls_id, "TEXT", ""), Array(f_moulinette_order_xls_group_id, "NUMERIC", ""), Array(f_moulinette_order_xls_ticker, "TEXT", ""), Array(f_moulinette_order_xls_symbol_redi, "TEXT", ""), Array(f_moulinette_order_xls_datetime, "NUMERIC", ""), Array(f_moulinette_order_xls_side, "TEXT", ""), Array(f_moulinette_order_xls_order_qty, "NUMERIC", ""), Array(f_moulinette_order_xls_order_price, "REAL", ""), Array(f_moulinette_order_xls_json_tag, "TEXT", "")), Array(Array(f_moulinette_order_xls_id, "ASC")))
+    create_table_query = sqlite3_get_query_create_table(t_moulinette_order_xls, Array(Array(f_moulinette_order_xls_id, "TEXT", ""), Array(f_moulinette_order_xls_group_id, "NUMERIC", ""), Array(f_moulinette_order_xls_ticker, "TEXT", ""), Array(f_moulinette_order_xls_symbol_redi, "TEXT", ""), Array(f_moulinette_order_xls_datetime, "NUMERIC", ""), Array(f_moulinette_order_xls_side, "TEXT", ""), Array(f_moulinette_order_xls_order_qty, "INTEGER", ""), Array(f_moulinette_order_xls_order_price, "REAL", ""), Array(f_moulinette_order_xls_json_tag, "TEXT", "")), Array(Array(f_moulinette_order_xls_id, "ASC")))
     create_tbl_status = sqlite3_create_tables(moulinette_get_db_complete_path, Array(create_table_query))
 End If
 

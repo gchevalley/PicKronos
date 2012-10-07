@@ -42,6 +42,9 @@ Public Const c_tradator_central_rank_eps As Integer = 27
 Public Const c_tradator_nav_pnl As Integer = 28
 Public Const c_tradator_avg_pnl As Integer = 29
 
+Public Const sheet_broker_call As String = "brokers call"
+Public Const l_tdtr_broker_call_first_line_date = 8
+Public Const c_tdtr_broker_call_id = 1
 Public Const c_tdtr_broker_call_ticker_and_date = 2
 Public Const c_tdtr_broker_call_broker = 3
 Public Const c_tdtr_broker_call_side = 4 ' long/short
@@ -799,7 +802,8 @@ Dim tmp_order_line As String
 
 Dim tmp_side As String, tmp_qty As Double, tmp_symbol As String, tmp_price As Double
 If frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value <> "" And UCase(ActiveWorkbook.name) = UCase("Tradator.xls") And ActiveSheet.name = "portfolio live" Then
-
+    
+    Application.Calculation = xlCalculationManual
     
     tmp_order_line = frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value
     
@@ -830,6 +834,8 @@ If frm_Tradator_choose_qty_price.CB_side_symbol_qty_price.Value <> "" And UCase(
 End If
 
 frm_Tradator_choose_qty_price.Hide
+
+Application.Calculation = xlCalculationAutomatic
 
 End Sub
 
@@ -1073,14 +1079,300 @@ End If
 End Function
 
 
-Public Sub tradator_insert_daily_update_downgrade()
+Public Sub tradator_insert_daily_update_downgrade_from_broker()
+
+Dim rec_mention() As Variant
+    rec_mention = Array("@downgrade", "@upgrade", "@ug", "@dg")
+
+Dim oReg As New VBScript_RegExp_55.RegExp
+Dim match As VBScript_RegExp_55.match
+Dim matches As VBScript_RegExp_55.MatchCollection
+
+oReg.Global = True
+oReg.IgnoreCase = True
+
+Dim oJSON As New JSONLib
 
 Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer
 
-'remonte les call du jour
+Dim tmp_vec() As Variant
+
+Application.Calculation = xlCalculationManual
+Application.ReferenceStyle = xlA1
+
+'remonte les call du jour de twitter
 Dim sql_query As String
-sql_query = "SELECT"
+sql_query = "SELECT " & f_tweet_id & ", " & f_tweet_datetime & ", " & f_tweet_text & ", " & f_tweet_json_tickers & ", " & f_tweet_json_hashtags & ", " & f_tweet_json_mentions
+    sql_query = sql_query & " FROM " & t_tweet
+    sql_query = sql_query & " WHERE " & f_tweet_datetime & ">=" & ToJulianDay(Date - 7)
+    sql_query = sql_query & " AND " & f_tweet_json_tickers & " IS NOT NULL"
+    
+    sql_query = sql_query & " AND ("
+        For i = 0 To UBound(rec_mention, 1)
+            If i = 0 Then
+            Else
+                sql_query = sql_query & " OR "
+            End If
+
+            sql_query = sql_query & f_tweet_json_mentions & " LIKE ""%" & UCase(rec_mention(i)) & "%"""
+
+        Next i
+    sql_query = sql_query & ")"
+    
+    sql_query = sql_query & " ORDER BY " & f_tweet_datetime & " DESC"
+
+Dim extract_daily_tweet_rec As Variant
+extract_daily_tweet_rec = sqlite3_query(twitter_get_db_path, sql_query)
 
 
+'repere si date deja dispo dans tradator sinon rajoute les lignes necessaire
+Dim tmp_wrbk As Workbook
+Dim find_tradator As Boolean
+find_tradator = False
+For Each tmp_wrbk In Application.Workbooks
+    If UCase(tmp_wrbk.name) = UCase("tradator.xls") Then
+        find_tradator = True
+    End If
+Next
+
+If find_tradator = False Then
+    MsgBox ("tradator.xls not open ! ->Exit.")
+    Exit Sub
+End If
+
+
+If UBound(extract_daily_tweet_rec, 1) > 0 Then
+    
+    'detect des dim
+    sql_query = "SELECT " & f_tweet_id & ", " & f_tweet_datetime & ", " & f_tweet_text & ", " & f_tweet_json_tickers & ", " & f_tweet_json_hashtags & ", " & f_tweet_json_mentions
+    For i = 0 To UBound(extract_daily_tweet_rec(0), 1)
+        If extract_daily_tweet_rec(0)(i) = f_tweet_id Then
+            dim_extract_tweet_id = i
+        ElseIf extract_daily_tweet_rec(0)(i) = f_tweet_datetime Then
+            dim_extract_datetime = i
+        ElseIf extract_daily_tweet_rec(0)(i) = f_tweet_text Then
+            dim_extract_text = i
+        ElseIf extract_daily_tweet_rec(0)(i) = f_tweet_json_tickers Then
+            dim_extract_tickers = i
+        ElseIf extract_daily_tweet_rec(0)(i) = f_tweet_json_hashtags Then
+            dim_extract_hashtags = i
+        ElseIf extract_daily_tweet_rec(0)(i) = f_tweet_json_mentions Then
+            dim_extract_mentions = i
+        End If
+    Next i
+    
+    
+    If Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date, c_tdtr_broker_call_ticker_and_date) = Date Then
+    Else
+        
+        'rajoute des lignes
+        For i = 1 To 5
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).rows(l_tdtr_broker_call_first_line_date).EntireRow.Insert
+        Next i
+        
+        
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date, c_tdtr_broker_call_ticker_and_date) = Date
+        
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 1, c_tdtr_broker_call_ticker_and_date) = "Daily @ug / @dg"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 1, c_tdtr_broker_call_ticker_and_date).Font.Bold = True
+        
+        'header
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_id) = "tweet id"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_ticker_and_date) = "TITRE"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_broker) = "BROKER"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_side) = "sens"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_new_rec) = "REC"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_old_rec) = "Prev Rec"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_target_price) = "PT"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_comment) = "comment"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_last_price) = "last price"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_last_price).Interior.ColorIndex = 41
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_last_price).Font.Bold = True
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_low) = "low"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_low).Interior.ColorIndex = 41
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_low).Font.Bold = True
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_high) = "high"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_high).Interior.ColorIndex = 41
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_high).Font.Bold = True
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_open) = "open"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_open).Interior.ColorIndex = 6
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_open).Font.Bold = True
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_vwap) = "vwap"
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_vwap).Interior.ColorIndex = 37
+            Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_vwap).Font.Bold = True
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_ratio_last_open) = "last/open"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_ratio_last_extrem) = "last/extreme"
+        Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(l_tdtr_broker_call_first_line_date + 2, c_tdtr_broker_call_ratio_last_vwap) = "last/vwap"
+        
+        
+    End If
+    
+    
+    'insertion des ligne manquante
+    For i = 1 To UBound(extract_daily_tweet_rec, 1)
+        
+        'deja en place ?
+        For j = l_tdtr_broker_call_first_line_date + 2 + 1 To 1500
+            If Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_id) = "" Then
+                'not found need to insert
+                
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).rows(j).EntireRow.Insert
+                
+                'conversion des json en vecteur
+                Set colTickers = oJSON.parse(decode_json_from_DB(extract_daily_tweet_rec(i)(dim_extract_tickers)))
+                If colTickers Is Nothing Then
+                    vec_ticker = Empty
+                Else
+                    k = 0
+                    For Each tmp_ticker In colTickers
+                        ReDim Preserve tmp_vec(k)
+                        tmp_vec(k) = get_clean_ticker_bloomberg(tmp_ticker)
+                        k = k + 1
+                        Exit For 'only one
+                    Next
+                    
+                    vec_ticker = tmp_vec
+                    
+                End If
+                
+                tmp_ticker = vec_ticker(0)
+                
+                
+                
+                Set colHashtags = oJSON.parse(decode_json_from_DB(extract_daily_tweet_rec(i)(dim_extract_hashtags)))
+                If colHashtags Is Nothing Then
+                    vec_hashtag = Empty
+                Else
+                    k = 0
+                    For Each tmp_hashtag In colHashtags
+                        ReDim Preserve tmp_vec(k)
+                        tmp_vec(k) = tmp_hashtag
+                        k = k + 1
+                    Next
+                    
+                    vec_hashtag = tmp_vec
+                
+                End If
+                
+                
+                Set colMentions = oJSON.parse(decode_json_from_DB(extract_daily_tweet_rec(i)(dim_extract_mentions)))
+                If colMentions Is Nothing Then
+                    vec_mention = Empty
+                Else
+                    k = 0
+                    For Each tmp_mention In colMentions
+                        ReDim Preserve tmp_vec(k)
+                        tmp_vec(k) = tmp_mention
+                        k = k + 1
+                    Next
+                    
+                    vec_mention = tmp_vec
+                
+                End If
+                
+                
+                
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_id) = extract_daily_tweet_rec(i)(dim_extract_tweet_id)
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ticker_and_date) = tmp_ticker
+                
+                
+                For m = 0 To UBound(vec_mention, 1)
+                    For n = 0 To UBound(rec_mention, 1)
+                        If UCase(vec_mention(m)) = UCase(rec_mention(n)) Then
+                            
+                            If InStr(UCase(rec_mention(n)), "DG") <> 0 Or InStr(UCase(rec_mention(n)), "DOWNGRADE") <> 0 Then
+                                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_side) = "short"
+                            Else
+                                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_side) = "long"
+                            End If
+                            
+                            'Exit For
+                        Else
+                            If n = UBound(rec_mention, 1) Then
+                                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_broker) = vec_mention(m)
+                            End If
+                        End If
+                    Next n
+                Next m
+                
+                oReg.Pattern = "\sto\s[\w|\s]+(\s#TGT|\sby)"
+                Set matches = oReg.Execute(extract_daily_tweet_rec(i)(dim_extract_text))
+                
+                
+                tmp_rec = ""
+                For Each match In matches
+                    tmp_rec = match.Value
+                    
+                    tmp_rec = Replace(tmp_rec, " to ", "")
+                    tmp_rec = Replace(tmp_rec, " #TGT", "")
+                    tmp_rec = Replace(tmp_rec, " by", "")
+                    
+                    Exit For
+                Next
+                
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_new_rec) = tmp_rec
+                
+                
+                oReg.Pattern = "#TGT\s[\d]+(\.[\d]+|)"
+                Set matches = oReg.Execute(extract_daily_tweet_rec(i)(dim_extract_text))
+                
+                tmp_pt = ""
+                For Each match In matches
+                    tmp_pt = match.Value
+                    tmp_pt = Replace(tmp_pt, "#TGT ", "")
+                    Exit For
+                Next
+                
+                If IsNumeric(tmp_pt) Then
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_target_price) = CDbl(tmp_pt)
+                End If
+                
+                
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_comment) = extract_daily_tweet_rec(i)(dim_extract_text)
+                
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_last_price).FormulaLocal = "=BDP($" & xlColumnValue(c_tdtr_broker_call_ticker_and_date) & j & ";" & xlColumnValue(c_tdtr_broker_call_last_price) & "$" & l_tdtr_broker_call_first_line_date + 2 & ")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_last_price).Interior.ColorIndex = xlNone
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_last_price).Font.ColorIndex = 11
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_last_price).Font.Bold = True
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_low).FormulaLocal = "=BDP($" & xlColumnValue(c_tdtr_broker_call_ticker_and_date) & j & ";" & xlColumnValue(c_tdtr_broker_call_low) & "$" & l_tdtr_broker_call_first_line_date + 2 & ")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_low).Interior.ColorIndex = xlNone
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_low).Font.ColorIndex = 11
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_low).Font.Bold = True
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_high).FormulaLocal = "=BDP($" & xlColumnValue(c_tdtr_broker_call_ticker_and_date) & j & ";" & xlColumnValue(c_tdtr_broker_call_high) & "$" & l_tdtr_broker_call_first_line_date + 2 & ")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_high).Interior.ColorIndex = xlNone
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_high).Font.ColorIndex = 11
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_high).Font.Bold = True
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_open).FormulaLocal = "=BDP($" & xlColumnValue(c_tdtr_broker_call_ticker_and_date) & j & ";" & xlColumnValue(c_tdtr_broker_call_open) & "$" & l_tdtr_broker_call_first_line_date + 2 & ")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_open).Interior.ColorIndex = 6
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_open).Font.ColorIndex = 11
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_open).Font.Bold = True
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_vwap).FormulaLocal = "=BDP($" & xlColumnValue(c_tdtr_broker_call_ticker_and_date) & j & ";" & xlColumnValue(c_tdtr_broker_call_vwap) & "$" & l_tdtr_broker_call_first_line_date + 2 & ")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_vwap).Interior.ColorIndex = 37
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_vwap).Font.ColorIndex = 11
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_vwap).Font.Bold = True
+                
+                'calc ratio
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_open).FormulaLocal = "=" & xlColumnValue(c_tdtr_broker_call_last_price) & j & "/" & xlColumnValue(c_tdtr_broker_call_open) & j & "-1"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_open).NumberFormat = "0.00%"
+                    
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_extrem).FormulaLocal = "=" & xlColumnValue(c_tdtr_broker_call_last_price) & j & "/IF(" & xlColumnValue(c_tdtr_broker_call_side) & j & "=""long"";" & xlColumnValue(c_tdtr_broker_call_low) & j & ";" & xlColumnValue(c_tdtr_broker_call_high) & j & ")-1"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_extrem).NumberFormat = "0.00%"
+                    
+                Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_vwap).FormulaLocal = "=IF(ISNUMBER(" & xlColumnValue(c_tdtr_broker_call_vwap) & j & ");" & xlColumnValue(c_tdtr_broker_call_last_price) & j & "/" & xlColumnValue(c_tdtr_broker_call_vwap) & j & "-1;"""")"
+                    Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_ratio_last_vwap).NumberFormat = "0.00%"
+                
+                GoTo check_next_entry_reco
+                
+            ElseIf Workbooks("tradator.xls").Worksheets(sheet_broker_call).Cells(j, c_tdtr_broker_call_id) = extract_daily_tweet_rec(i)(dim_extract_tweet_id) Then
+                'jump to next ticker, already in the list
+                GoTo check_next_entry_reco
+            End If
+        Next j
+check_next_entry_reco:
+    Next i
+    
+End If
+
+Application.Calculation = xlCalculationAutomatic
 
 End Sub
