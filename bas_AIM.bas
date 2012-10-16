@@ -74,6 +74,10 @@ Public Const c_header_aim_eod_accpbpid_underlying As String = "CUSTOM_accpbpid_u
 Public Const c_header_aim_eod_accpbpid_close_qty As String = "CUSTOM_accpbpid_close_qty"
 Public Const c_header_aim_eod_accpbpid_close_price As String = "CUSTOM_accpbpid_close_price"
 Public Const c_header_aim_eod_accpbpid_local_close_ytd_pnl As String = "CUSTOM_accpbpid_ytd_pnl_local_net"
+Public Const c_header_aim_eod_uc_underyling_id As String = "CUSTOM_uc_id"
+Public Const c_header_aim_eod_uc_ytd_pnl As String = "CUSTOM_uc_ytd_pnl"
+Public Const c_header_aim_eod_uc_comm As String = "CUSTOM_uc_comm"
+
 
 
 Public Const c_header_aim_equities_product_id As String = "identifier"
@@ -178,6 +182,9 @@ Public c_aim_eod_accpbpid_underlying As Integer
 Public c_aim_eod_accpbpid_close_qty As Integer
 Public c_aim_eod_accpbpid_close_price As Integer
 Public c_aim_eod_accpbpid_local_close_ytd_pnl As Integer
+Public c_aim_eod_uc_underyling_id As Integer
+Public c_aim_eod_uc_ytd_pnl As Integer
+Public c_aim_eod_uc_comm As Integer
 
 
 
@@ -437,7 +444,7 @@ Dim oBBG As New cls_Bloomberg_Sync
 
 
 Dim underyling_override As Variant
-underyling_override = Array(Array("SX5ED", "DSX5E"))
+underyling_override = aim_get_override_underlying()
 
 Dim vec_asset_product() As Variant
     vec_asset_product = Array("Equity", "Equity Option", "Index Future", "Index Option")
@@ -744,6 +751,7 @@ If count_entry_mav > 0 Then
         tmp_buid = tmp_vec_row(dim_dico_buid)
         tmp_ticker = tmp_vec_row(dim_dico_ticker)
         tmp_asset_type = tmp_vec_row(dim_dico_asset_type)
+        tmp_currency = UCase(tmp_vec_row(dim_dico_currency)) 'mode code
         tmp_qty = tmp_vec_row(dim_dico_qty)
         tmp_price = tmp_vec_row(dim_dico_price)
         tmp_ytd_pnl = tmp_vec_row(dim_dico_ytd)
@@ -782,6 +790,7 @@ If count_entry_mav > 0 Then
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_underlying_id) = tmp_uid
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_instrument_type) = tmp_asset_type
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_ticker) = tmp_ticker
+        Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_currency) = tmp_currency
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_close_qty) = tmp_qty
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_close_price) = tmp_price
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_local_close_ytd_pnl_gross) = tmp_ytd_pnl
@@ -801,6 +810,9 @@ If count_entry_mav > 0 Then
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_accpbpid_close_qty) = tmp_qty
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_accpbpid_close_price) = tmp_price
         Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_accpbpid_local_close_ytd_pnl) = tmp_ytd_pnl - tmp_ytd_comm
+        Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_uc_underyling_id) = tmp_uid & "_" & tmp_currency
+        Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_uc_ytd_pnl) = tmp_ytd_pnl
+        Workbooks("Kronos.xls").Worksheets(aim_view_eod).Cells(k + l_header_aim_view, c_aim_eod_uc_comm) = tmp_ytd_comm
         
         
         k = k + 1
@@ -1015,10 +1027,17 @@ exec_query = sqlite3_query(base_path & db_bridge_import_mav, "DELETE FROM " & t_
 
 End Sub
 
+
+Private Function aim_get_override_underlying() As Variant
+
+aim_get_override_underlying = Array(Array("SX5ED", "DSX5E"))
+
+End Function
+
 Private Sub aim_autocomplete_formula_with_import_bloomberg_mav()
 
 Dim underyling_override As Variant
-underyling_override = Array(Array("SX5ED", "DSX5E"))
+underyling_override = aim_get_override_underlying
 
 datetime_start = Now()
 
@@ -1718,7 +1737,7 @@ new_passage_through_the_loop:
                             c_sheet_ytd_pnl = 0
                             
                             For n = 1 To m - 1
-                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "ytd_pnl_local_gross") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "vendor_close_price") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "yesterday_close_local") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "yesterday_mid_price") <> 0 Then
+                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "ytd_pnl_local_net") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "vendor_close_price") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "yesterday_close_local") <> 0 Or InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "yesterday_mid_price") <> 0 Then
                                     c_sheet_ytd_pnl = n
                                     Exit For
                                 End If
@@ -1851,7 +1870,7 @@ new_passage_through_the_loop:
                             c_sheet_ytd_pnl = 0
                             
                             For n = 1 To m - 1
-                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "ytd_pnl_local_gross") <> 0 Then
+                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "ytd_pnl_local_net") <> 0 Then
                                     c_sheet_ytd_pnl = n
                                     Exit For
                                 End If
@@ -1872,9 +1891,51 @@ new_passage_through_the_loop:
                             
                             Worksheets(tmp_sheet).Cells(j, m).Value = "=RC" & c_sheet_ntcf
                             
+                        
+                        ElseIf Worksheets(tmp_sheet).Cells(l_header_aim_view, m) = c_header_aim_eod_uc_underyling_id Then
+                            
+                            c_sheet_underyling = 0
+                            c_sheet_crncy = 0
+                            
+                            For n = 1 To m - 1
+                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), c_header_aim_eod_currency) <> 0 Then
+                                    c_sheet_crncy = n
+                                ElseIf InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), c_header_aim_eod_underlying_id) <> 0 Then
+                                    c_sheet_underyling = n
+                                End If
+                            Next n
+                            
+                            Worksheets(tmp_sheet).Cells(j, m).Value = "=RC" & c_sheet_underyling & "&""_""&" & "RC" & c_sheet_crncy
+                        
+                        ElseIf Worksheets(tmp_sheet).Cells(l_header_aim_view, m) = c_header_aim_eod_uc_ytd_pnl Then
+                            
+                            c_sheet_ytd_pnl = 0
+                            
+                            For n = 1 To m - 1
+                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "ytd_pnl_local_net") <> 0 Then
+                                    c_sheet_ytd_pnl = n
+                                    Exit For
+                                End If
+                            Next n
+                            
+                            Worksheets(tmp_sheet).Cells(j, m).Value = "=RC" & c_sheet_ytd_pnl
+                        
+                        ElseIf Worksheets(tmp_sheet).Cells(l_header_aim_view, m) = c_header_aim_eod_uc_comm Then
+                            
+                            c_sheet_total_comm = 0
+                            
+                            For n = 1 To m - 1
+                                If InStr(LCase(Worksheets(tmp_sheet).Cells(l_header_aim_view, n)), "tra_cost_total") <> 0 Then
+                                    c_sheet_total_comm = n
+                                    Exit For
+                                End If
+                            Next n
+                            
+                            Worksheets(tmp_sheet).Cells(j, m).Value = "=RC" & c_sheet_total_comm
+                        
                         End If
                         
-                    Else ' il s agit d un champ de la base kronos pictet
+                    Else 'CAS STANDARD il s agit d un champ de la base kronos pictet
                         Worksheets(tmp_sheet).Cells(j, m).Value = Replace("=RTD(""Kronos.RTDServer"";"""";R1C2;R" & l_header_aim_view & "C;RC1)", ";", ",")
                         
                         If m = 2 Then
@@ -3202,6 +3263,27 @@ For i = 0 To UBound(vec_list_view, 1)
                 
                 ElseIf Worksheets(aim_view_eod).Cells(l_header_aim_view, j) = c_header_aim_eod_accpbpid_local_close_ytd_pnl Then
                     c_aim_eod_accpbpid_local_close_ytd_pnl = j
+                    
+                    ReDim Preserve vec_tmp(k)
+                    vec_tmp(k) = Array(Worksheets(aim_view_eod).Cells(l_header_aim_view, j).Value, j)
+                    k = k + 1
+                
+                ElseIf Worksheets(aim_view_eod).Cells(l_header_aim_view, j) = c_header_aim_eod_uc_underyling_id Then
+                    c_aim_eod_uc_underyling_id = j
+                    
+                    ReDim Preserve vec_tmp(k)
+                    vec_tmp(k) = Array(Worksheets(aim_view_eod).Cells(l_header_aim_view, j).Value, j)
+                    k = k + 1
+                
+                ElseIf Worksheets(aim_view_eod).Cells(l_header_aim_view, j) = c_header_aim_eod_uc_ytd_pnl Then
+                    c_aim_eod_uc_ytd_pnl = j
+                    
+                    ReDim Preserve vec_tmp(k)
+                    vec_tmp(k) = Array(Worksheets(aim_view_eod).Cells(l_header_aim_view, j).Value, j)
+                    k = k + 1
+                
+                ElseIf Worksheets(aim_view_eod).Cells(l_header_aim_view, j) = c_header_aim_eod_uc_comm Then
+                    c_aim_eod_uc_comm = j
                     
                     ReDim Preserve vec_tmp(k)
                     vec_tmp(k) = Array(Worksheets(aim_view_eod).Cells(l_header_aim_view, j).Value, j)
@@ -5572,8 +5654,11 @@ Dim l_color_index As Integer
 Dim tmp_vec() As Variant
 Dim tmp_formula As String
 Dim l_future_spot As String
+Dim currency_text As String
 Dim currency_color_code As Integer
 Dim currency_code As Integer
+
+Application.ScreenUpdating = False
 
 For i = 0 To UBound(vec_product_underlying_ticker_instrument_type_account_and_pb, 1)
     
@@ -5640,6 +5725,7 @@ For i = 0 To UBound(vec_product_underlying_ticker_instrument_type_account_and_pb
     
     For j = 0 To UBound(vec_currency, 1)
         If UCase(vec_currency(j)(dim_currency_txt)) = UCase(output_bdp(i)(dim_bbg_CRNCY)) Then
+            currency_text = UCase(vec_currency(j)(dim_currency_txt))
             currency_code = vec_currency(j)(dim_currency_code)
             l_underlying_ccy_row = vec_currency(j)(dim_currency_line)
             currency_color_code = vec_currency(j)(dim_currency_color)
@@ -6432,10 +6518,28 @@ For i = 0 To UBound(vec_product_underlying_ticker_instrument_type_account_and_pb
                                 tmp_formula = "=BDP(""" & aim_get_risk_free_asset_ticker_based_on_currency_and_expiry(data_internal_db_index(m)(n), CInt(output_bdp(i)(dim_bbg_OPT_EXPIRE_DT) - Date)) & """;""LAST_TRADE"")/100"
                             v_0x_rd = Replace(tmp_formula, ";", ",")
                             
+                            'check si currency de l underyling est differentes, necessite ajustement de net trading cf et du pnl ytd
+                            If data_internal_db_index(m)(n) <> currency_code Then
+                                
+                                For p = 0 To UBound(vec_currency, 1)
+                                    If vec_currency(p)(dim_currency_code) = data_internal_db_index(m)(n) Then
+                                        conv_ticker_ntcf = currency_text & UCase(vec_currency(p)(dim_currency_txt)) & " Curncy"
+                                        Exit For
+                                    End If
+                                Next p
+                                
+                                'ajustement du net trading cash flow afin de le transformer dans le devise de l underlying
+                                tmp_formula = "=IF(AND(EX_DATE>RC[-24],RC[-38]=0),0,(IF(ISNUMBER(VLOOKUP(RC96,AIM_Options_DPB,6,FALSE)),BDP(""<%CURRENCY%>"",""PX_LAST"")*VLOOKUP(RC96,AIM_Options_DPB,6,FALSE),0)+((RC9-RC45)*RC110*RC44)))"
+                                    
+                                    tmp_formula = Replace(tmp_formula, "<%CURRENCY%>", conv_ticker_ntcf)
+                                    v_au_derivative_realized_pnl = tmp_formula
+                                
+                            End If
                             
                         ElseIf data_internal_db_index(0)(n) = "Currency code color override" Then
                             
                             v_dc_currency_code = data_internal_db_index(m)(n)
+                            
                             
                             For p = 0 To UBound(vec_currency, 1)
                                 If vec_currency(p)(dim_currency_code) = data_internal_db_index(m)(n) Then
@@ -6741,6 +6845,8 @@ bypass_insert_new_entry_in_open:
 
 Next i
 
+
+Application.ScreenUpdating = True
 
 Dim vb_answer As Variant
 If count_code_3_equity_db > 0 Then
@@ -7739,13 +7845,30 @@ End If
 'insertions des lignes dans la sheet
 If k > 0 Then
     
+    Dim vec_underlying_override As Variant
+    vec_underlying_override = aim_get_override_underlying()
+    
     Debug.Print "aim_prepare_stats_derivatives_multi_account find " & k & " buidt_underyling missing in " & sheet_index_db_multi_accounts
     
     'appel bbg pour connaitre les crncy afin de determiner les currency code
     Dim vec_ticker_index() As Variant
     For i = 0 To UBound(vec_need_to_be_open_in_index_multi_accounts, 1) 'pas forcement efficient car plusieurs fois le meme possible
         ReDim Preserve vec_ticker_index(i)
-        vec_ticker_index(i) = "/buid/" & vec_need_to_be_open_in_index_multi_accounts(i)(2)
+            
+        
+        For j = 0 To UBound(vec_underlying_override, 1)
+            If "EI09" & vec_underlying_override(j)(1) = vec_need_to_be_open_in_index_multi_accounts(i)(2) Then
+                
+                vec_ticker_index(i) = "/buid/" & "EI09" & vec_underlying_override(j)(0)
+                Exit For
+            Else
+                If j = UBound(vec_underlying_override, 1) Then
+                    vec_ticker_index(i) = "/buid/" & vec_need_to_be_open_in_index_multi_accounts(i)(2)
+                End If
+            End If
+        
+        Next j
+        
     Next i
     
     Dim oBBG As New cls_Bloomberg_Sync
