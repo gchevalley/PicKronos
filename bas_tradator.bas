@@ -32,7 +32,7 @@ Public Const c_tradator_rrr As Integer = 19
 Public Const c_tradator_risk As Integer = 20 ' ???
 Public Const c_tradator_room As Integer = 21
 Public Const c_tradator_nav_target As Integer = 22
-Public Const c_tradator_currency As Integer = 23 'deprecier
+Public Const c_tradator_currency As Integer = 23 'deprecie
 Public Const c_tradator_change_rate As Integer = 24 'deprecie
 Public Const c_tradator_contract_size As Integer = 25 'deprecie
 Public Const c_tradator_option_strike As Integer = 26 'deprecie
@@ -61,6 +61,51 @@ Public Const c_tdtr_broker_call_ratio_last_open = 14
 Public Const c_tdtr_broker_call_ratio_last_extrem = 15 ' low if buy / high if sell
 Public Const c_tdtr_broker_call_ratio_last_vwap = 16
 
+
+Public Const db_tradator As String = "db_tradator.sqlt3"
+    Public Const t_tradator_readonly As String = "t_tradator_readonly"
+        Public Const f_tradator_readonly_id As String = "f_tradator_readonly_id"
+        Public Const f_tradator_readonly_trade_id As String = "f_tradator_readonly_trade_id"
+        Public Const f_tradator_readonly_portfolio_line As String = "f_tradator_readonly_portfolio_line"
+        Public Const f_tradator_readonly_archive_line As String = "f_tradator_readonly_archive_line"
+        Public Const f_tradator_readonly_remaining_qty As String = "f_tradator_readonly_remaining_qty"
+        Public Const f_tradator_readonly_final_exec_qty As String = "f_tradator_readonly_final_exec_qty"
+        Public Const f_tradator_readonly_final_exec_price As String = "f_tradator_readonly_final_exec_price"
+
+
+Public Function tradator_get_db_fullpath() As String
+
+Dim tmp_wrbk As Workbook
+For Each tmp_wrbk In Workbooks
+    If UCase(tmp_wrbk.name) = UCase(tradator_wrbk) Then
+        tradator_get_db_fullpath = Replace(UCase(tmp_wrbk.FullName), UCase(tmp_wrbk.name), db_tradator)
+        Exit Function
+    End If
+Next
+
+MsgBox (tradator_wrbk & " not opened !")
+
+End Function
+
+
+Private Sub tradator_init_db()
+
+create_db_status = sqlite3_create_db(tradator_get_db_fullpath)
+
+Dim create_table_sql_query As String
+If sqlite3_check_if_table_already_exist(tradator_get_db_fullpath, t_tradator_readonly) = False Then
+    create_table_sql_query = sqlite3_get_query_create_table(t_tradator_readonly, Array(Array(f_tradator_readonly_id, "TEXT", ""), Array(f_tradator_readonly_trade_id, "NUMERIC", ""), Array(f_tradator_readonly_portfolio_line, "NUMERIC", ""), Array(f_tradator_readonly_archive_line, "NUMERIC", ""), Array(f_tradator_readonly_remaining_qty, "NUMERIC", ""), Array(f_tradator_readonly_final_exec_qty, "NUMERIC", ""), Array(f_tradator_readonly_final_exec_price, "NUMERIC", "")), Array(Array(f_tradator_readonly_id, "ASC")))
+    create_table_status = sqlite3_create_tables(tradator_get_db_fullpath, Array(create_table_sql_query))
+End If
+
+End Sub
+
+
+Private Sub tradator_manip_db()
+
+'exec_query = sqlite3_query(tradator_get_db_fullpath, "DROP TABLE " & t_tradator_readonly)
+
+End Sub
 
 
 Public Function tradator_get_vec_mention_to_track() As Variant
@@ -1104,7 +1149,7 @@ Application.ReferenceStyle = xlA1
 Dim sql_query As String
 sql_query = "SELECT " & f_tweet_id & ", " & f_tweet_datetime & ", " & f_tweet_text & ", " & f_tweet_json_tickers & ", " & f_tweet_json_hashtags & ", " & f_tweet_json_mentions
     sql_query = sql_query & " FROM " & t_tweet
-    sql_query = sql_query & " WHERE " & f_tweet_datetime & ">=" & ToJulianDay(Date - 7)
+    sql_query = sql_query & " WHERE " & f_tweet_datetime & ">=" & ToJulianDay(Date)
     sql_query = sql_query & " AND " & f_tweet_json_tickers & " IS NOT NULL"
     
     sql_query = sql_query & " AND ("
@@ -1238,20 +1283,21 @@ If UBound(extract_daily_tweet_rec, 1) > 0 Then
                 tmp_ticker = vec_ticker(0)
                 
                 
-                
-                Set colHashtags = oJSON.parse(decode_json_from_DB(extract_daily_tweet_rec(i)(dim_extract_hashtags)))
-                If colHashtags Is Nothing Then
-                    vec_hashtag = Empty
-                Else
-                    k = 0
-                    For Each tmp_hashtag In colHashtags
-                        ReDim Preserve tmp_vec(k)
-                        tmp_vec(k) = tmp_hashtag
-                        k = k + 1
-                    Next
+                If IsNull(extract_daily_tweet_rec(i)(dim_extract_hashtags)) = False Then
+                    Set colHashtags = oJSON.parse(decode_json_from_DB(extract_daily_tweet_rec(i)(dim_extract_hashtags)))
+                    If colHashtags Is Nothing Then
+                        vec_hashtag = Empty
+                    Else
+                        k = 0
+                        For Each tmp_hashtag In colHashtags
+                            ReDim Preserve tmp_vec(k)
+                            tmp_vec(k) = tmp_hashtag
+                            k = k + 1
+                        Next
+                        
+                        vec_hashtag = tmp_vec
                     
-                    vec_hashtag = tmp_vec
-                
+                    End If
                 End If
                 
                 
@@ -1295,7 +1341,7 @@ If UBound(extract_daily_tweet_rec, 1) > 0 Then
                     Next n
                 Next m
                 
-                oReg.Pattern = "\sto\s[\w|\s]+(\s#TGT|\sby)"
+                oReg.Pattern = "\sto\s[\w|\s|/]+(\s#TGT|\sby)"
                 Set matches = oReg.Execute(extract_daily_tweet_rec(i)(dim_extract_text))
                 
                 
@@ -1376,3 +1422,376 @@ End If
 Application.Calculation = xlCalculationAutomatic
 
 End Sub
+
+
+Public Sub tradator_close_current_live_position()
+
+If UCase(ActiveWorkbook.name) = UCase(tradator_wrbk) And UCase(ActiveSheet.name) = UCase(tradator_sheet) And ActiveCell.row > l_tradator_header Then
+    tmp_line_concern = ActiveCell.row
+    
+    Dim tmp_exec_qty As Variant
+    Dim tmp_exec_price As Variant
+    
+get_exec_qty:
+    tmp_exec_qty = InputBox("Exec qty ?")
+    If IsNumeric(tmp_exec_qty) Then
+        tmp_exec_qty = CDbl(tmp_exec_qty)
+    Else
+        GoTo get_exec_qty
+    End If
+
+get_exec_price:
+    tmp_exec_price = InputBox("Exec price ?")
+    If IsNumeric(tmp_exec_price) Then
+        tmp_exec_price = CDbl(tmp_exec_price)
+    Else
+        GoTo get_exec_price
+    End If
+    
+    Call tradator_close_live_position(tmp_line_concern, tmp_exec_qty, tmp_exec_price, False)
+    
+Else
+    Exit Sub
+End If
+
+End Sub
+
+
+Private Sub tradator_close_live_position(ByVal line_concern As Integer, ByVal exec_qty As Double, ByVal exec_price As Double, ByVal bypass_db_readonly As Boolean)
+
+Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer, p As Integer, q As Integer
+Dim sql_query As String
+
+Call tradator_init_db
+
+Application.Calculation = xlCalculationManual
+
+Dim tmp_wrbk As Workbook
+Set tmp_wrbk = Workbooks(tradator_wrbk)
+
+Dim tmp_tweet_id As Integer
+    tmp_tweet_id = -1
+
+Dim tmp_line_concern As Integer
+    tmp_line_concern = -1
+
+Dim tmp_range As Range
+Dim tmp_formula As String
+
+Dim tmp_side As String
+
+Dim tmp_avg_exec_price As Double
+    tmp_avg_exec_price = 0
+Dim tmp_already_qty As Double
+    tmp_already_qty = 0
+Dim remaining_qty As Double
+    remaining_qty = 0
+Dim tmp_ntcf As Double
+    tmp_ntcf = 0
+
+
+
+If tmp_wrbk.readOnly = False And bypass_db_readonly = False Then
+    'check si des entrees ne serait pas dispo dans la db readonly
+    sql_query = "SELECT * FROM " & t_tradator_readonly
+    Dim extract_trade_readonly As Variant
+    extract_trade_readonly = sqlite3_query(tradator_get_db_fullpath, sql_query)
+    
+    If UBound(extract_trade_readonly, 1) > 0 Then
+        
+        'detect dim
+        For i = 0 To UBound(extract_trade_readonly(0), 1)
+            
+            If extract_trade_readonly(0)(i) = f_tradator_readonly_id Then
+                dim_extract_readonly_id = i
+            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_trade_id Then
+                dim_extract_readonly_trade_id = i
+            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_remaining_qty Then
+                dim_extract_readonly_remaining_qty = i
+            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_final_exec_qty Then
+                dim_extract_readonly_exec_qty = i
+            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_final_exec_price Then
+                dim_extract_readonly_exec_price = i
+            End If
+            
+        Next i
+        
+        
+        For i = 1 To UBound(extract_trade_readonly, 1)
+            
+            For j = l_tradator_header + 1 To 15000
+                If Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_idea_id) = "" Then
+                    Exit For
+                Else
+                    If Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_idea_id) = extract_trade_readonly(i)(dim_extract_readonly_trade_id) Then
+                        tmp_line_concern = j
+                        
+                        tmp_answer = MsgBox("Update " & Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_ticker).Value & " with " & extract_trade_readonly(i)(dim_extract_readonly_exec_qty) & " @ " & extract_trade_readonly(i)(dim_extract_readonly_exec_price), vbYesNo)
+                        
+                        
+                        If tmp_answer = vbYes Then
+                            
+                            'check si existe dans archives sinon utilise la procedure normale
+                            For m = l_tradator_header + 1 To 15000
+                                If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_idea_id) = "" Then
+                                    'procedure normale
+                                    Call tradator_close_live_position(j, extract_trade_readonly(i)(dim_extract_readonly_exec_qty), extract_trade_readonly(i)(dim_extract_readonly_exec_price), True)
+                                    Exit For
+                                Else
+                                    If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_idea_id) = extract_trade_readonly(i)(dim_extract_readonly_trade_id) Then
+                                        
+                                        tmp_already_qty = Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec)
+                                        tmp_ntcf = Abs(Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec)) * Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_last_price) + Abs(extract_trade_readonly(i)(dim_extract_readonly_exec_qty)) * extract_trade_readonly(i)(dim_extract_readonly_exec_price)
+                                        tmp_already_qty = tmp_already_qty + extract_trade_readonly(i)(dim_extract_readonly_exec_qty)
+                                        tmp_avg_exec_price = Abs(tmp_ntcf) / Abs(tmp_already_qty)
+                                        
+                                        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec) = tmp_already_qty
+                                        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_last_price) = tmp_avg_exec_price
+                                        
+                                        
+                                        Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_qty_exec) = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_qty_exec) - extract_trade_readonly(i)(dim_extract_readonly_exec_qty)
+                                        
+                                        Exit For
+                                    End If
+                                End If
+                            Next m
+                            
+                        Else
+                            
+                        End If
+                        
+                        
+                        'degage la ligne de la db
+                        sql_query = "DELETE FROM " & t_tradator_readonly & " WHERE " & f_tradator_readonly_id & "=""" & extract_trade_readonly(i)(dim_extract_readonly_id) & """"
+                        exec_status = sqlite3_query(tradator_get_db_fullpath, sql_query)
+                        
+                        
+                        Exit For
+                    End If
+                End If
+            Next j
+            
+            
+            
+        Next i
+        
+    End If
+    
+End If
+
+
+Dim oReg As New VBScript_RegExp_55.RegExp
+Dim match As VBScript_RegExp_55.match
+Dim matches As VBScript_RegExp_55.MatchCollection
+
+oReg.Global = True
+oReg.IgnoreCase = True
+
+
+
+
+'remonte la live current row
+tmp_line_concern = line_concern
+tmp_tweet_id = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(line_concern, c_tradator_idea_id)
+
+
+
+
+
+'existe t  il deja une ligne dans archive ?
+Dim last_line As Integer
+    last_line = -1
+Dim found_archive As Variant
+    found_archive = False
+
+For i = l_tradator_header + 1 To 25000
+    
+    If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(i, c_tradator_idea_id) = "" Then
+        last_line = i
+        Exit For
+    Else
+        If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(i, c_tradator_idea_id) = tmp_tweet_id Then
+            found_archive = i
+            last_line = i
+            Exit For
+        End If
+    End If
+    
+Next i
+    
+    
+
+If UCase(Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, c_tradator_side).Value) = "LONG" Then
+    tmp_side = "B"
+ElseIf UCase(Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, c_tradator_side).Value) = "SHORT" Then
+    tmp_side = "S"
+End If
+
+remaining_qty = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, c_tradator_qty_exec).Value
+
+
+If found_archive = False Then
+    'transfert d une copie de la ligne
+    For i = c_tradator_idea_id To c_tradator_avg_pnl
+        
+        Set tmp_range = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, i)
+        
+        If tmp_range.HasFormula = True Then
+            tmp_formula = tmp_range.FormulaLocal
+            
+            'extraction des lignes
+            oReg.Pattern = "[\d]+"
+            Set matches = oReg.Execute(tmp_formula)
+            
+            For Each match In matches
+                If match.Value = CStr(tmp_line_concern) Then
+                    tmp_formula = Replace(tmp_formula, match.Value, last_line)
+                End If
+            Next
+            
+            'remplace la ligne
+            Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, i).FormulaLocal = tmp_formula
+            
+        Else
+            Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, i).Value = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, i).Value
+        End If
+    Next i
+    
+    
+    'vire qty + price
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_qty_exec) = 0
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price) = 0
+    
+    
+    'mise en forme
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_idea_date).NumberFormat = "d-mmm"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_idea_time).NumberFormat = "h:mm"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pct_potential_profit).NumberFormat = "0.00%"
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pct_potential_loss).NumberFormat = "0.00%"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_qty_exec).NumberFormat = "#,##0"
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_nominal_base).NumberFormat = "#,##0"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_currency).Font.ColorIndex = 11
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_currency).Font.Bold = True
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_option_strike).Font.ColorIndex = 11
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_option_strike).Font.Bold = True
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price).NumberFormat = "#,##0.00"
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price).Font.ColorIndex = 11
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price).Font.Bold = True
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pct_nav).NumberFormat = "0.00%"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_trigger).NumberFormat = "#,##0.00"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).NumberFormat = "#,##0.00"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).Font.ColorIndex = 3
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).FormatConditions.Delete
+    
+    If tmp_side = "B" Then
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line
+    ElseIf tmp_side = "S" Then
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line
+    End If
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).FormatConditions(1).Interior.ColorIndex = 3
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_stop).FormatConditions(1).Font.ColorIndex = 2
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).Font.ColorIndex = 12
+
+
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).FormatConditions.Delete
+    If tmp_side = "B" Then
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line
+    ElseIf tmp_side = "S" Then
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line
+    End If
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).FormatConditions(1).Interior.ColorIndex = 12
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_theo_target).FormatConditions(1).Font.ColorIndex = 2
+
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).NumberFormat = "#,##0"
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).Font.Bold = True
+
+
+    Dim limit_pnl_color As Double
+    limit_pnl_color = 500
+                                
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).FormatConditions.Delete
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=limit_pnl_color
+            Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).FormatConditions(1).Interior.ColorIndex = 6
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=-limit_pnl_color
+            Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_pnl_base).FormatConditions(2).Interior.ColorIndex = 3
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_nav_target).NumberFormat = "0.0000%"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_nav_pnl).NumberFormat = "#,##0.0%"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).NumberFormat = "#,##0.00%"
+
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).FormatConditions.Delete
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=0
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).FormatConditions(1).Interior.ColorIndex = 6
+    Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=0
+        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_avg_pnl).FormatConditions(2).Interior.ColorIndex = 3
+
+    
+Else
+    tmp_already_qty = Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_qty_exec)
+    tmp_avg_exec_price = Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price)
+    tmp_ntcf = Abs(tmp_already_qty) * tmp_avg_exec_price
+    
+    
+End If
+
+Dim tmp_exec_qty As Double
+Dim tmp_exec_price As Double
+
+tmp_exec_qty = exec_qty
+tmp_exec_price = exec_price
+
+
+'ajust block
+If remaining_qty < 0 Then
+    tmp_exec_qty = -Abs(tmp_exec_qty)
+Else
+    tmp_exec_qty = Abs(tmp_exec_qty)
+End If
+
+
+tmp_already_qty = tmp_already_qty + tmp_exec_qty
+tmp_ntcf = tmp_ntcf + Abs(tmp_exec_qty) * tmp_exec_price
+tmp_avg_exec_price = Abs(tmp_ntcf) / Abs(tmp_already_qty)
+
+
+'remplace les valeurs
+Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_qty_exec) = tmp_already_qty
+Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_tradator_last_price) = tmp_avg_exec_price
+
+Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, c_tradator_qty_exec).Value = remaining_qty - tmp_exec_qty
+
+
+If tmp_wrbk.readOnly = True And bypass_db_readonly = False Then
+    'save dans la db pour le prochain loading
+    Dim vec_data() As Variant
+    ReDim Preserve vec_data(0)
+    vec_data(0) = Array(CStr(year(Date) & Right("0" & Month(Date), 2) & Right("0" & day(Date), 2) & Right("0" & Hour(Now), 2) & Right("0" & Minute(Now), 2) & Right("0" & Second(Now), 2)), tmp_tweet_id, tmp_line_concern, last_line, remaining_qty - tmp_exec_qty, tmp_exec_qty, tmp_exec_price)
+    insert_status = sqlite3_insert_with_transaction(tradator_get_db_fullpath, t_tradator_readonly, vec_data, Array(f_tradator_readonly_id, f_tradator_readonly_trade_id, f_tradator_readonly_portfolio_line, f_tradator_readonly_archive_line, f_tradator_readonly_remaining_qty, f_tradator_readonly_final_exec_qty, f_tradator_readonly_final_exec_price))
+    debug_test = sqlite3_query(tradator_get_db_fullpath, "SELECT * FROM " & t_tradator_readonly)
+End If
+
+End Sub
+
+
+Public Sub tradator_update_from_read_only_file()
+
+Call tradator_init_db
+
+End Sub
+
