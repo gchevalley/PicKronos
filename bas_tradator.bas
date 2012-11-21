@@ -518,40 +518,10 @@ sql_query = "SELECT " & f_tweet_id & " FROM " & t_tweet & " WHERE " & f_tweet_id
 extract_new_id = sqlite3_query(twitter_get_db_path, sql_query)
 
 
-
-'remonte vec currency
-Dim vec_currency() As Variant
-dim_currency_txt = 0
-dim_currency_code = 1
-dim_currency_line = 2
-dim_currency_rate = 3
-
-k = 0
-For i = 14 To 32
-    If Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 1) = "" Then
-        Exit For
-    Else
-        ReDim Preserve vec_currency(k)
-        vec_currency(k) = Array(Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 1).Value, Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 5).Value, i, Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 6).Value)
-        k = k + 1
-    End If
-Next i
-        
-
-
-
-Dim data_bbg As Variant
-
-
-
-
 Dim extract_tweets As Variant
 
 k = 0
 Dim final_tweet_to_add As New Collection
-
-Dim last_line_tradator As Integer
-last_line_tradator = tradator_get_last_line()
 
 Dim tmp_check_fullfill_requirements As Scripting.Dictionary
 
@@ -619,208 +589,7 @@ For i = 0 To UBound(vec_mention, 1)
                         If tmp_check_fullfill_requirements Is Nothing Or tmp_tweet_id <= 168 Then
                         Else
                             
-                            Dim bbg_fields() As Variant
-                            bbg_fields = Array("CRNCY", "OPT_CONT_SIZE_REAL", "OPT_STRIKE_PX")
-                                
-                                For n = 0 To UBound(bbg_fields, 1)
-                                    If UCase(bbg_fields(n)) = UCase("CRNCY") Then
-                                        dim_bbg_CRNCY = n
-                                    ElseIf UCase(bbg_fields(n)) = UCase("OPT_CONT_SIZE_REAL") Then
-                                        dim_bbg_OPT_CONT_SIZE_REAL = n
-                                    ElseIf UCase(bbg_fields(n)) = UCase("OPT_STRIKE_PX") Then
-                                        dim_bbg_OPT_STRIKE_PX = n
-                                    End If
-                                Next n
-                                
-                            
-                            data_bbg = oBBG.bdp(Array(UCase(tmp_check_fullfill_requirements.Item("ticker"))), bbg_fields, output_format.of_vec_without_header)
-                            
-                            
-                            'peut etre insere
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_id) = tmp_check_fullfill_requirements.Item("id")
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_source) = Replace(UCase(tmp_check_fullfill_requirements.Item("src")), "@", "")
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_ticker) = UCase(tmp_check_fullfill_requirements.Item("ticker"))
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_asset) = tmp_check_fullfill_requirements.Item("asset")
-                            
-                            year_int = year(tmp_check_fullfill_requirements.Item("datetime"))
-                            month_int = Month(tmp_check_fullfill_requirements.Item("datetime"))
-                            day_int = day(tmp_check_fullfill_requirements.Item("datetime"))
-                            hour_int = Hour(tmp_check_fullfill_requirements.Item("datetime"))
-                            minute_int = Minute(tmp_check_fullfill_requirements.Item("datetime"))
-                            second_int = Second(tmp_check_fullfill_requirements.Item("datetime"))
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_date) = DateSerial(year_int, month_int, day_int)
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_date).NumberFormat = "d-mmm"
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_time) = TimeSerial(hour_int, minute_int, second_int)
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_time).NumberFormat = "h:mm"
-                            
-                            tmp_formula_pct_profit = "IF(AND(" & xlColumnValue(c_tradator_theo_target) & last_line_tradator + 1 & "<>"""";" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "<>"""");(" & xlColumnValue(c_tradator_theo_target) & last_line_tradator + 1 & "/" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "-1);"""")"
-                            tmp_formula_pct_loss = "IF(AND(" & xlColumnValue(c_tradator_theo_stop) & last_line_tradator + 1 & "<>"""";" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "<>"""");(" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "/" & xlColumnValue(c_tradator_theo_stop) & last_line_tradator + 1 & "-1);"""")"
-                            
-                            If tmp_check_fullfill_requirements.Item("side") = "B" Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_side) = "long"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).FormulaLocal = "=" & tmp_formula_pct_profit
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).FormulaLocal = "=" & tmp_formula_pct_loss
-                                
-                                
-                            ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_side) = "SHORT"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).FormulaLocal = "=-" & tmp_formula_pct_profit
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).FormulaLocal = "=" & tmp_formula_pct_loss
-                                
-                                
-                            End If
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).NumberFormat = "0.00%"
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).NumberFormat = "0.00%"
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_qty_exec) = 0
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_qty_exec).NumberFormat = "#,##0"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).NumberFormat = "#,##0"
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency) = UCase(data_bbg(0)(dim_bbg_CRNCY))
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency).Font.ColorIndex = 11
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency).Font.Bold = True
-                            
-                            'rate de kronos
-                            For n = 0 To UBound(vec_currency, 1)
-                                If UCase(vec_currency(n)(dim_currency_txt)) = UCase(data_bbg(0)(dim_bbg_CRNCY)) Then
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_change_rate).FormulaLocal = "=[Kronos.xls]Parametres!$F$" & vec_currency(n)(dim_currency_line)
-                                    Exit For
-                                End If
-                            Next n
-                            
-                            
-                            If UCase(tmp_check_fullfill_requirements.Item("asset")) = "STOCK" Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_contract_size) = 1
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).FormulaLocal = "=BDP(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""LAST_PRICE"")"
-                                'Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=-" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
-                                
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_central_rank_eps).FormulaLocal = "=CENTRAL(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""rank_eps"")"
-                                
-                            ElseIf UCase(tmp_check_fullfill_requirements.Item("asset")) = "OPTION" Then
-                                
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).FormulaLocal = "=BDP(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""PX_MID"")"
-                                
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_contract_size) = data_bbg(0)(dim_bbg_OPT_CONT_SIZE_REAL)
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike) = data_bbg(0)(dim_bbg_OPT_STRIKE_PX)
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike).Font.ColorIndex = 11
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike).Font.Bold = True
-                                    
-                                
-                                
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=-" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_option_strike) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_contract_size) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
-                                
-                                
-                                'extraction underlying ticker pour note central
-                                oReg.Pattern = "[A-Za-z0-9]+\s[A-Za-z]{2}\s"
-                                Set matches = oReg.Execute(UCase(tmp_check_fullfill_requirements.Item("ticker")))
-                                For Each match In matches
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_central_rank_eps).FormulaLocal = "=CENTRAL(""" & match.Value & "EQUITY"";""rank_eps"")"
-                                Next
-                                
-                                
-                            End If
-                            
-                                'format
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).NumberFormat = "#,##0.00"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).Font.ColorIndex = 11
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).Font.Bold = True
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_nav).FormulaLocal = "=" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & "/$I$2"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_nav).NumberFormat = "0.00%"
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_trigger) = ""
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_trigger).NumberFormat = "#,##0.00"
-                            
-                            
-                            If tmp_check_fullfill_requirements.Exists("stop") Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop) = tmp_check_fullfill_requirements.Item("stop")
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).NumberFormat = "#,##0.00"
-                                
-                                    'format
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).Font.ColorIndex = 3
-                                
-                                    'cond format
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Delete
-                                    If tmp_check_fullfill_requirements.Item("side") = "B" Then
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
-                                    ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
-                                    End If
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions(1).Interior.ColorIndex = 3
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions(1).Font.ColorIndex = 2
-                            End If
-                            
-                            If tmp_check_fullfill_requirements.Exists("target") Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target) = tmp_check_fullfill_requirements.Item("target")
-                                
-                                'format
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).Font.ColorIndex = 12
-                                
-                                'cond format
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Delete
-                                    If tmp_check_fullfill_requirements.Item("side") = "B" Then
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
-                                    ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
-                                    End If
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions(1).Interior.ColorIndex = 12
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions(1).Font.ColorIndex = 2
-                                
-                            End If
-                            
-                            If tmp_check_fullfill_requirements.Exists("room") Then
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_room) = tmp_check_fullfill_requirements.Item("room")
-                            End If
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormulaLocal = "=" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_contract_size) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1 & "*(" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "-" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & ")"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).NumberFormat = "#,##0"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).Font.Bold = True
-                                
-                                
-                                'cond format
-                                Dim limit_pnl_color As Double
-                                    limit_pnl_color = 500
-                                
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Delete
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=limit_pnl_color
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions(1).Interior.ColorIndex = 6
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=-limit_pnl_color
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions(2).Interior.ColorIndex = 3
-                            
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_target).FormulaLocal = "=" & xlColumnValue(c_tradator_pct_nav) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_pct_potential_profit) & last_line_tradator + 1
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_target).NumberFormat = "0.0000%"
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_pnl).FormulaLocal = "=" & xlColumnValue(c_tradator_pnl_base) & last_line_tradator + 1 & "/$I$2*100"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_pnl).NumberFormat = "#,##0.0%"
-                            
-                            
-                            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormulaLocal = "=IF(" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & "<>0;" & xlColumnValue(c_tradator_pnl_base) & last_line_tradator + 1 & "/ABS(" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & ");"""")"
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).NumberFormat = "#,##0.00%"
-                                
-                                'cond format
-                                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Delete
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=0
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions(1).Interior.ColorIndex = 6
-                                    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=0
-                                        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions(2).Interior.ColorIndex = 3
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            last_line_tradator = last_line_tradator + 1
+                            Call tradator_insert_new_entry_live_portfolio(tmp_check_fullfill_requirements)
                             
                         End If
                         
@@ -829,8 +598,8 @@ For i = 0 To UBound(vec_mention, 1)
             Next m
             
         Next j
+        
     End If
-    
     
 Next i
 
@@ -838,6 +607,237 @@ Application.Calculation = xlCalculationAutomatic
 
 End Function
 
+
+Private Sub tradator_insert_new_entry_live_portfolio(tmp_check_fullfill_requirements As Object)
+
+Dim oBBG As New cls_Bloomberg_Sync
+
+Dim data_bbg As Variant
+Dim bbg_fields() As Variant
+
+
+If tmp_check_fullfill_requirements Is Nothing Then
+Else
+
+    'remonte vec currency
+    Dim vec_currency() As Variant
+    dim_currency_txt = 0
+    dim_currency_code = 1
+    dim_currency_line = 2
+    dim_currency_rate = 3
+
+    k = 0
+    For i = 14 To 32
+        If Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 1) = "" Then
+            Exit For
+        Else
+            ReDim Preserve vec_currency(k)
+            vec_currency(k) = Array(Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 1).Value, Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 5).Value, i, Workbooks("Kronos.xls").Worksheets("Parametres").Cells(i, 6).Value)
+            k = k + 1
+        End If
+    Next i
+
+
+    Dim last_line_tradator As Integer
+    last_line_tradator = tradator_get_last_line()
+
+
+    bbg_fields = Array("CRNCY", "OPT_CONT_SIZE_REAL", "OPT_STRIKE_PX")
+        
+        For n = 0 To UBound(bbg_fields, 1)
+            If UCase(bbg_fields(n)) = UCase("CRNCY") Then
+                dim_bbg_CRNCY = n
+            ElseIf UCase(bbg_fields(n)) = UCase("OPT_CONT_SIZE_REAL") Then
+                dim_bbg_OPT_CONT_SIZE_REAL = n
+            ElseIf UCase(bbg_fields(n)) = UCase("OPT_STRIKE_PX") Then
+                dim_bbg_OPT_STRIKE_PX = n
+            End If
+        Next n
+        
+    
+    data_bbg = oBBG.bdp(Array(UCase(tmp_check_fullfill_requirements.Item("ticker"))), bbg_fields, output_format.of_vec_without_header)
+    
+    
+    'peut etre insere
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_id) = tmp_check_fullfill_requirements.Item("id")
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_source) = Replace(UCase(tmp_check_fullfill_requirements.Item("src")), "@", "")
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_ticker) = UCase(tmp_check_fullfill_requirements.Item("ticker"))
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_asset) = tmp_check_fullfill_requirements.Item("asset")
+    
+    year_int = year(tmp_check_fullfill_requirements.Item("datetime"))
+    month_int = Month(tmp_check_fullfill_requirements.Item("datetime"))
+    day_int = day(tmp_check_fullfill_requirements.Item("datetime"))
+    hour_int = Hour(tmp_check_fullfill_requirements.Item("datetime"))
+    minute_int = Minute(tmp_check_fullfill_requirements.Item("datetime"))
+    second_int = Second(tmp_check_fullfill_requirements.Item("datetime"))
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_date) = DateSerial(year_int, month_int, day_int)
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_date).NumberFormat = "d-mmm"
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_time) = TimeSerial(hour_int, minute_int, second_int)
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_idea_time).NumberFormat = "h:mm"
+    
+    tmp_formula_pct_profit = "IF(AND(" & xlColumnValue(c_tradator_theo_target) & last_line_tradator + 1 & "<>"""";" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "<>"""");(" & xlColumnValue(c_tradator_theo_target) & last_line_tradator + 1 & "/" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "-1);"""")"
+    tmp_formula_pct_loss = "IF(AND(" & xlColumnValue(c_tradator_theo_stop) & last_line_tradator + 1 & "<>"""";" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "<>"""");(" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & "/" & xlColumnValue(c_tradator_theo_stop) & last_line_tradator + 1 & "-1);"""")"
+    
+    If tmp_check_fullfill_requirements.Item("side") = "B" Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_side) = "long"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).FormulaLocal = "=" & tmp_formula_pct_profit
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).FormulaLocal = "=" & tmp_formula_pct_loss
+        
+        
+    ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_side) = "SHORT"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).FormulaLocal = "=-" & tmp_formula_pct_profit
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).FormulaLocal = "=" & tmp_formula_pct_loss
+        
+        
+    End If
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_profit).NumberFormat = "0.00%"
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_potential_loss).NumberFormat = "0.00%"
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_qty_exec) = 0
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_qty_exec).NumberFormat = "#,##0"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).NumberFormat = "#,##0"
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency) = UCase(data_bbg(0)(dim_bbg_CRNCY))
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency).Font.ColorIndex = 11
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_currency).Font.Bold = True
+    
+    'rate de kronos
+    For n = 0 To UBound(vec_currency, 1)
+        If UCase(vec_currency(n)(dim_currency_txt)) = UCase(data_bbg(0)(dim_bbg_CRNCY)) Then
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_change_rate).FormulaLocal = "=[Kronos.xls]Parametres!$F$" & vec_currency(n)(dim_currency_line)
+            Exit For
+        End If
+    Next n
+    
+    
+    If UCase(tmp_check_fullfill_requirements.Item("asset")) = "STOCK" Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_contract_size) = 1
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).FormulaLocal = "=BDP(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""LAST_PRICE"")"
+        'Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=-" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
+        
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_central_rank_eps).FormulaLocal = "=CENTRAL(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""rank_eps"")"
+        
+    ElseIf UCase(tmp_check_fullfill_requirements.Item("asset")) = "OPTION" Then
+        
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).FormulaLocal = "=BDP(" & xlColumnValue(c_tradator_ticker) & last_line_tradator + 1 & ";""PX_MID"")"
+        
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_contract_size) = data_bbg(0)(dim_bbg_OPT_CONT_SIZE_REAL)
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike) = data_bbg(0)(dim_bbg_OPT_STRIKE_PX)
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike).Font.ColorIndex = 11
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_option_strike).Font.Bold = True
+            
+        
+        
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nominal_base).FormulaLocal = "=-" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_option_strike) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_contract_size) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1
+        
+        
+        'extraction underlying ticker pour note central
+        oReg.Pattern = "[A-Za-z0-9]+\s[A-Za-z]{2}\s"
+        Set matches = oReg.Execute(UCase(tmp_check_fullfill_requirements.Item("ticker")))
+        For Each match In matches
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_central_rank_eps).FormulaLocal = "=CENTRAL(""" & match.Value & "EQUITY"";""rank_eps"")"
+        Next
+        
+        
+    End If
+    
+        'format
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).NumberFormat = "#,##0.00"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).Font.ColorIndex = 11
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_last_price).Font.Bold = True
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_nav).FormulaLocal = "=" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & "/$I$2"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pct_nav).NumberFormat = "0.00%"
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_trigger) = ""
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_trigger).NumberFormat = "#,##0.00"
+    
+    
+    If tmp_check_fullfill_requirements.Exists("stop") Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop) = tmp_check_fullfill_requirements.Item("stop")
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).NumberFormat = "#,##0.00"
+        
+            'format
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).Font.ColorIndex = 3
+        
+            'cond format
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Delete
+            If tmp_check_fullfill_requirements.Item("side") = "B" Then
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
+            ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
+            End If
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions(1).Interior.ColorIndex = 3
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_stop).FormatConditions(1).Font.ColorIndex = 2
+    End If
+    
+    If tmp_check_fullfill_requirements.Exists("target") Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target) = tmp_check_fullfill_requirements.Item("target")
+        
+        'format
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).Font.ColorIndex = 12
+        
+        'cond format
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Delete
+            If tmp_check_fullfill_requirements.Item("side") = "B" Then
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
+            ElseIf tmp_check_fullfill_requirements.Item("side") = "S" Then
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:="=$" & xlColumnValue(c_tradator_last_price) & "$" & last_line_tradator + 1
+            End If
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions(1).Interior.ColorIndex = 12
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_theo_target).FormatConditions(1).Font.ColorIndex = 2
+        
+    End If
+    
+    If tmp_check_fullfill_requirements.Exists("room") Then
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_room) = tmp_check_fullfill_requirements.Item("room")
+    End If
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormulaLocal = "=" & xlColumnValue(c_tradator_qty_exec) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_contract_size) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_change_rate) & last_line_tradator + 1 & "*(" & xlColumnValue(c_tradator_last_price) & last_line_tradator + 1 & "-" & xlColumnValue(c_tradator_trigger) & last_line_tradator + 1 & ")"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).NumberFormat = "#,##0"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).Font.Bold = True
+        
+        
+        'cond format
+        Dim limit_pnl_color As Double
+            limit_pnl_color = 500
+        
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Delete
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=limit_pnl_color
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions(1).Interior.ColorIndex = 6
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=-limit_pnl_color
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_pnl_base).FormatConditions(2).Interior.ColorIndex = 3
+    
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_target).FormulaLocal = "=" & xlColumnValue(c_tradator_pct_nav) & last_line_tradator + 1 & "*" & xlColumnValue(c_tradator_pct_potential_profit) & last_line_tradator + 1
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_target).NumberFormat = "0.0000%"
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_pnl).FormulaLocal = "=" & xlColumnValue(c_tradator_pnl_base) & last_line_tradator + 1 & "/$I$2*100"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_nav_pnl).NumberFormat = "#,##0.0%"
+    
+    
+    Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormulaLocal = "=IF(" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & "<>0;" & xlColumnValue(c_tradator_pnl_base) & last_line_tradator + 1 & "/ABS(" & xlColumnValue(c_tradator_nominal_base) & last_line_tradator + 1 & ");"""")"
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).NumberFormat = "#,##0.00%"
+        
+        'cond format
+        Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Delete
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlGreater, Formula1:=0
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions(1).Interior.ColorIndex = 6
+            Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions.Add type:=xlCellValue, Operator:=xlLess, Formula1:=0
+                Worksheets(tradator_sheet).Cells(last_line_tradator + 1, c_tradator_avg_pnl).FormatConditions(2).Interior.ColorIndex = 3
+
+End If
+
+End Sub
 
 
 Public Sub tradator_insert_qty_price_from_form()
@@ -977,7 +977,7 @@ If IsRediReady Then
         End If
         
         ThisWorkbook.OrderQuery.UserID = ""
-        ThisWorkbook.OrderQuery.Password = ""
+        ThisWorkbook.OrderQuery.password = ""
         vtable = "Message"
         vwhere = "true"
         
@@ -1457,7 +1457,7 @@ End If
 End Sub
 
 
-Private Sub tradator_close_live_position(ByVal line_concern As Integer, ByVal exec_qty As Double, ByVal exec_price As Double, ByVal bypass_db_readonly As Boolean)
+Private Sub tradator_sync_readonly(ByVal bypass_db_readonly As Boolean)
 
 Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer, p As Integer, q As Integer
 Dim sql_query As String
@@ -1468,12 +1468,6 @@ Application.Calculation = xlCalculationManual
 
 Dim tmp_wrbk As Workbook
 Set tmp_wrbk = Workbooks(tradator_wrbk)
-
-Dim tmp_tweet_id As Integer
-    tmp_tweet_id = -1
-
-Dim tmp_line_concern As Integer
-    tmp_line_concern = -1
 
 Dim tmp_range As Range
 Dim tmp_formula As String
@@ -1571,13 +1565,138 @@ If tmp_wrbk.readOnly = False And bypass_db_readonly = False Then
                 End If
             Next j
             
-            
-            
         Next i
         
     End If
     
 End If
+
+End Sub
+
+
+Private Sub tradator_close_live_position(ByVal line_concern As Integer, ByVal exec_qty As Double, ByVal exec_price As Double, ByVal bypass_db_readonly As Boolean)
+
+Dim i As Integer, j As Integer, k As Integer, m As Integer, n As Integer, p As Integer, q As Integer
+Dim sql_query As String
+
+Call tradator_init_db
+
+Application.Calculation = xlCalculationManual
+
+Dim tmp_wrbk As Workbook
+Set tmp_wrbk = Workbooks(tradator_wrbk)
+
+Dim tmp_tweet_id As Integer
+    tmp_tweet_id = -1
+
+Dim tmp_line_concern As Integer
+    tmp_line_concern = -1
+
+Dim tmp_range As Range
+Dim tmp_formula As String
+
+Dim tmp_side As String
+
+Dim tmp_avg_exec_price As Double
+    tmp_avg_exec_price = 0
+Dim tmp_already_qty As Double
+    tmp_already_qty = 0
+Dim remaining_qty As Double
+    remaining_qty = 0
+Dim tmp_ntcf As Double
+    tmp_ntcf = 0
+
+
+
+Call tradator_sync_readonly(bypass_db_readonly)
+
+'If tmp_wrbk.readOnly = False And bypass_db_readonly = False Then
+'    'check si des entrees ne serait pas dispo dans la db readonly
+'    sql_query = "SELECT * FROM " & t_tradator_readonly
+'    Dim extract_trade_readonly As Variant
+'    extract_trade_readonly = sqlite3_query(tradator_get_db_fullpath, sql_query)
+'
+'    If UBound(extract_trade_readonly, 1) > 0 Then
+'
+'        'detect dim
+'        For i = 0 To UBound(extract_trade_readonly(0), 1)
+'
+'            If extract_trade_readonly(0)(i) = f_tradator_readonly_id Then
+'                dim_extract_readonly_id = i
+'            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_trade_id Then
+'                dim_extract_readonly_trade_id = i
+'            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_remaining_qty Then
+'                dim_extract_readonly_remaining_qty = i
+'            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_final_exec_qty Then
+'                dim_extract_readonly_exec_qty = i
+'            ElseIf extract_trade_readonly(0)(i) = f_tradator_readonly_final_exec_price Then
+'                dim_extract_readonly_exec_price = i
+'            End If
+'
+'        Next i
+'
+'
+'        For i = 1 To UBound(extract_trade_readonly, 1)
+'
+'            For j = l_tradator_header + 1 To 15000
+'                If Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_idea_id) = "" Then
+'                    Exit For
+'                Else
+'                    If Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_idea_id) = extract_trade_readonly(i)(dim_extract_readonly_trade_id) Then
+'                        tmp_line_concern = j
+'
+'                        tmp_answer = MsgBox("Update " & Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_ticker).Value & " with " & extract_trade_readonly(i)(dim_extract_readonly_exec_qty) & " @ " & extract_trade_readonly(i)(dim_extract_readonly_exec_price), vbYesNo)
+'
+'
+'                        If tmp_answer = vbYes Then
+'
+'                            'check si existe dans archives sinon utilise la procedure normale
+'                            For m = l_tradator_header + 1 To 15000
+'                                If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_idea_id) = "" Then
+'                                    'procedure normale
+'                                    Call tradator_close_live_position(j, extract_trade_readonly(i)(dim_extract_readonly_exec_qty), extract_trade_readonly(i)(dim_extract_readonly_exec_price), True)
+'                                    Exit For
+'                                Else
+'                                    If Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_idea_id) = extract_trade_readonly(i)(dim_extract_readonly_trade_id) Then
+'
+'                                        tmp_already_qty = Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec)
+'                                        tmp_ntcf = Abs(Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec)) * Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_last_price) + Abs(extract_trade_readonly(i)(dim_extract_readonly_exec_qty)) * extract_trade_readonly(i)(dim_extract_readonly_exec_price)
+'                                        tmp_already_qty = tmp_already_qty + extract_trade_readonly(i)(dim_extract_readonly_exec_qty)
+'                                        tmp_avg_exec_price = Abs(tmp_ntcf) / Abs(tmp_already_qty)
+'
+'                                        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_qty_exec) = tmp_already_qty
+'                                        Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(m, c_tradator_last_price) = tmp_avg_exec_price
+'
+'
+'                                        Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_qty_exec) = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(j, c_tradator_qty_exec) - extract_trade_readonly(i)(dim_extract_readonly_exec_qty)
+'
+'                                        Exit For
+'                                    End If
+'                                End If
+'                            Next m
+'
+'                        Else
+'
+'                        End If
+'
+'
+'                        'degage la ligne de la db
+'                        sql_query = "DELETE FROM " & t_tradator_readonly & " WHERE " & f_tradator_readonly_id & "=""" & extract_trade_readonly(i)(dim_extract_readonly_id) & """"
+'                        exec_status = sqlite3_query(tradator_get_db_fullpath, sql_query)
+'
+'
+'                        Exit For
+'                    End If
+'                End If
+'            Next j
+'
+'
+'
+'        Next i
+'
+'    End If
+'
+'End If
 
 
 Dim oReg As New VBScript_RegExp_55.RegExp
@@ -1592,8 +1711,8 @@ oReg.IgnoreCase = True
 
 'remonte la live current row
 tmp_line_concern = line_concern
-tmp_tweet_id = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(line_concern, c_tradator_idea_id)
-
+tmp_tweet_id = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(line_concern, c_tradator_idea_id).Value
+tmp_ticker = Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(line_concern, c_tradator_ticker).Value
 
 
 
@@ -1776,6 +1895,16 @@ Workbooks(tradator_wrbk).Worksheets(tradator_archive_sheet).Cells(last_line, c_t
 
 Workbooks(tradator_wrbk).Worksheets(tradator_sheet).Cells(tmp_line_concern, c_tradator_qty_exec).Value = remaining_qty - tmp_exec_qty
 
+
+'proposition de suppression de la ligne si la pos est entierement cloturee
+If remaining_qty - tmp_exec_qty = 0 Then
+    answer = MsgBox("Position closed on " & tmp_ticker & ". Delete the line ?", vbYesNo)
+    
+    If answer = vbYes Then
+        Workbooks(tradator_wrbk).Worksheets(tradator_sheet).rows(tmp_line_concern).EntireRow.Delete
+    End If
+    
+End If
 
 If tmp_wrbk.readOnly = True And bypass_db_readonly = False Then
     'save dans la db pour le prochain loading
