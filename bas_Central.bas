@@ -143,10 +143,10 @@ End Sub
 
 Public Sub central_load_form()
 
-frm_central_mgmt_rank.CB_existing_rank = ""
-frm_central_mgmt_rank.LV_field.ListItems.Clear
+frm_Central_mgmt_rank.CB_existing_rank = ""
+frm_Central_mgmt_rank.LV_field.ListItems.Clear
 
-frm_central_mgmt_rank.Show
+frm_Central_mgmt_rank.Show
 
 End Sub
 
@@ -331,7 +331,7 @@ central_check_if_field_is_instead_formula = False
 Dim i As Integer
 
 Dim op_math() As Variant
-    op_math = Array("+", "-", "*", "/", "(", ")", "^")
+    op_math = Array("+", "-", "*", "/", "(", ")", "^") 'prise en compte auto des fn grace aux ( )
 
 Dim is_calc As Boolean
     is_calc = False
@@ -349,9 +349,21 @@ central_check_if_field_is_instead_formula = is_calc
 End Function
 
 
+Private Function central_get_xl_functions() As Variant
+
+Dim xl_fn() As Variant
+    xl_fn = Array("IF", "MIN", "MAX", "SUM", "ABS", "AND", "OR", "AVERAGE", "INT", "ROUND", "RAND", "ISUMBER", "LEN", "LEFT", "RIGHT", "LN", "LOG", "MEDIAN", "MOD", "MOD", "DAY", "MONTH", "YEAR", "HOUR", "MINUTE", "SECOND", "NOW")
+   
+central_get_xl_functions = xl_fn
+
+End Function
+
+
 Private Sub test_central_get_split_fields_from_calc()
 
 debug_test = central_get_split_fields_from_calc("WRT_GAMMA_BST*(%_OWNERSHIP_REQ_FOR_SPECIAL_MTG+2M_CALL_IMP_VOL_25DELTA_DFLT)-1^2M_PUT_IMP_VOL_50DELTA_DFLT/OPT_DELTA")
+
+debug_test = central_get_split_fields_from_calc("IF(ABS(CHG_PCT_MOV_AVG_200D)<2;CHG_PCT_MOV_AVG_200D;3)")
 
 End Sub
 
@@ -384,8 +396,20 @@ For i = 0 To UBound(op_math, 1)
     End If
 Next i
 
-
-oReg.Pattern = "[^\+^\-^\*^/^\)^\(]+"
+Dim xl_fn As Variant
+    xl_fn = central_get_xl_functions()
+    
+If is_calc = False Then
+    For i = 0 To UBound(xl_fn, 1)
+        If InStr(UCase(calc), UCase(xl_fn(i))) <> 0 Then
+            is_calc = True
+            Exit For
+        End If
+    Next i
+End If
+    
+    
+oReg.Pattern = "[^\+^\-^\*^/^\)^\(^<^>^=^;]+"
 
 k = 0
 Dim vec_fields() As Variant
@@ -397,9 +421,36 @@ If is_calc = True Then
     For Each match In matches
         If IsNumeric(match.Value) Then
         Else
-            ReDim Preserve vec_fields(k)
-            vec_fields(k) = match.Value
-            k = k + 1
+            
+            'check encore que l on a pas affaire a une fonction excel
+            For i = 0 To UBound(xl_fn, 1)
+                If UCase(xl_fn(i)) = UCase(match.Value) Then
+                    Exit For
+                Else
+                    If i = UBound(xl_fn, 1) Then
+                        
+                        'check doublon
+                        If k = 0 Then
+                            ReDim Preserve vec_fields(k)
+                            vec_fields(k) = UCase(match.Value)
+                            k = k + 1
+                        Else
+                            For j = 0 To UBound(vec_fields, 1)
+                                If UCase(match.Value) = vec_fields(j) Then
+                                    Exit For
+                                Else
+                                    If j = UBound(vec_fields, 1) Then
+                                        ReDim Preserve vec_fields(k)
+                                        vec_fields(k) = UCase(match.Value)
+                                        k = k + 1
+                                    End If
+                                End If
+                            Next j
+                        End If
+                    End If
+                End If
+            Next i
+            
         End If
     Next
     
@@ -900,6 +951,7 @@ For i = 0 To UBound(extract_data_for_ranking, 1)
                     
                 Next p
                 
+                tmp_calc = Replace(tmp_calc, ";", ",")
                 
                 If IsError(Evaluate(tmp_calc)) Then
                     tmp_row(m) = Null
@@ -1053,6 +1105,7 @@ extract_rank_distinct_sector = central_query_on_ranksqlt3(sql_query)
 sql_query = "SELECT Ticker, " & field_rank_sub_rank
     sql_query = sql_query & " FROM t_custom_rank"
     sql_query = sql_query & " WHERE " & field_rank_sub_rank & " IS NOT NULL"
+    sql_query = sql_query & " ORDER BY Ticker ASC"
 Dim extract_rank_ticker_and_sector As Variant
 extract_rank_ticker_and_sector = central_query_on_ranksqlt3(sql_query)
 
@@ -1062,9 +1115,140 @@ Dim data_ranked_sub_rank As Variant
 data_ranked_sub_rank = extract_data_for_ranking
 
 
+'append le sub rank pour faciliter matching futur
+tmp_row = extract_data_for_ranking(0)
+    tmp_row = extract_data_for_ranking(0)
+    ReDim Preserve tmp_row(UBound(tmp_row, 1) + 1)
+    tmp_row(UBound(tmp_row, 1)) = field_rank_sub_rank
+extract_data_for_ranking(0) = tmp_row
+
+
+For i = 1 To UBound(extract_data_for_ranking, 1)
+    
+    tmp_row = extract_data_for_ranking(i)
+    ReDim Preserve tmp_row(UBound(tmp_row, 1) + 1)
+    
+    For j = 1 To UBound(extract_rank_ticker_and_sector, 1)
+        
+        If extract_data_for_ranking(i)(0) = extract_rank_ticker_and_sector(j)(0) Then
+            
+            
+            tmp_row(UBound(tmp_row, 1)) = extract_rank_ticker_and_sector(j)(1)
+            
+            Exit For
+        End If
+        
+    Next j
+    
+    extract_data_for_ranking(i) = tmp_row
+    
+Next i
+
+
+
+
+'For u = 1 To UBound(extract_rank_distinct_sector, 1) 'boucle sur sector
+'
+'    For i = 1 To UBound(extract_data_for_ranking(0), 1) - 1 'saute final rank
+'
+'        For m = 1 To UBound(extract_rank_composition, 1)
+'
+'            'If extract_rank_composition(m)(dim_rank_bbg_field) = vec_bbg_fields(i - 1) Then
+'            If extract_rank_composition(m)(dim_rank_bbg_field)(1) = extract_data_for_ranking(0)(i) Or extract_rank_composition(m)(dim_rank_bbg_field)(0)(0) = extract_data_for_ranking(0)(i) Then
+'
+'                k = 0
+'                For j = 1 To UBound(extract_data_for_ranking, 1) 'boucle ticker
+'
+'                    'ne retient que les tickers du sector
+'                    For v = 1 To UBound(extract_rank_ticker_and_sector, 1) 'boucle helper ticker + sector
+'
+''                        If extract_rank_ticker_and_sector(v)(0) > extract_data_for_ranking(j)(0) Then
+''                            Exit For
+''                        End If
+'
+'                        If extract_rank_ticker_and_sector(v)(0) = extract_data_for_ranking(j)(0) Then 'match ticker
+'
+'                            If extract_rank_ticker_and_sector(v)(1) = extract_rank_distinct_sector(u)(0) Then 'match sector
+'
+'                                If IsNull(extract_data_for_ranking(j)(i)) = False Then
+'                                    ReDim Preserve tmp_column(k)
+'                                    tmp_column(k) = extract_data_for_ranking(j)(i)
+'                                    k = k + 1
+'                                Else
+'                                    data_ranked_sub_rank(j)(i) = extract_rank_composition(m)(dim_rank_rank_if_not_available)
+'                                End If
+'                            Else
+'                                Exit For
+'                            End If
+'
+'                            Exit For
+'                        End If
+'
+'                    Next v
+'
+'                Next j
+'
+'                If k > 0 Then
+'
+'                    'on sort le vecteur
+'                    For p = 0 To UBound(tmp_column, 1)
+'
+'                        min_max_pos = p
+'                        min_max_value = tmp_column(p)
+'
+'                        For q = p + 1 To UBound(tmp_column, 1)
+'
+'                            If extract_rank_composition(m)(dim_rank_order) = central_order_rank.big_is_best Then
+'                                If tmp_column(q) < min_max_value Then
+'                                    min_max_value = tmp_column(q)
+'                                    min_max_pos = q
+'                                End If
+'                            ElseIf extract_rank_composition(m)(dim_rank_order) = central_order_rank.small_is_best Then
+'                                If tmp_column(q) > min_max_value Then
+'                                    min_max_value = tmp_column(q)
+'                                    min_max_pos = q
+'                                End If
+'                            End If
+'
+'                        Next q
+'
+'
+'                        If min_max_pos <> p Then
+'                            min_max_value = tmp_column(p)
+'                            tmp_column(p) = tmp_column(min_max_pos)
+'                            tmp_column(min_max_pos) = min_max_value
+'                        End If
+'
+'                    Next p
+'
+'
+'                    'redonne a chaque titre sa note
+'                    For j = 1 To UBound(extract_data_for_ranking, 1)
+'                        For p = 0 To UBound(tmp_column, 1)
+'                            If extract_data_for_ranking(j)(i) = tmp_column(p) Then
+'                                data_ranked_sub_rank(j)(i) = p * (100 / (UBound(tmp_column, 1)))
+'                                'pas d exit for si meme donnee plus loin
+'                            End If
+'                        Next p
+'                    Next j
+'
+'
+'                Else
+'
+'                End If
+'
+'                Exit For
+'            End If
+'        Next m
+'
+'    Next i
+'
+'Next u
+
+
 For u = 1 To UBound(extract_rank_distinct_sector, 1) 'boucle sur sector
     
-    For i = 1 To UBound(extract_data_for_ranking(0), 1) - 1 'saute final rank
+    For i = 1 To UBound(extract_data_for_ranking(0), 1) - 2 'saute final rank + sector
         
         For m = 1 To UBound(extract_rank_composition, 1)
             
@@ -1074,28 +1258,45 @@ For u = 1 To UBound(extract_rank_distinct_sector, 1) 'boucle sur sector
                 k = 0
                 For j = 1 To UBound(extract_data_for_ranking, 1) 'boucle ticker
                     
-                    'ne retient que les tickers du sector
-                    For v = 1 To UBound(extract_rank_ticker_and_sector, 1) 'boucle helper ticker + sector
+                    If extract_data_for_ranking(j)(UBound(extract_data_for_ranking(j), 1)) = extract_rank_distinct_sector(u)(0) Then
                         
-                        If extract_rank_ticker_and_sector(v)(0) = extract_data_for_ranking(j)(0) Then 'match ticker
-                            
-                            If extract_rank_ticker_and_sector(v)(1) = extract_rank_distinct_sector(u)(0) Then 'match sector
-                            
-                                If IsNull(extract_data_for_ranking(j)(i)) = False Then
-                                    ReDim Preserve tmp_column(k)
-                                    tmp_column(k) = extract_data_for_ranking(j)(i)
-                                    k = k + 1
-                                Else
-                                    data_ranked_sub_rank(j)(i) = extract_rank_composition(m)(dim_rank_rank_if_not_available)
-                                End If
-                            Else
-                                Exit For
-                            End If
-                            
-                            Exit For
+                        If IsNull(extract_data_for_ranking(j)(i)) = False Then
+                            ReDim Preserve tmp_column(k)
+                            tmp_column(k) = extract_data_for_ranking(j)(i)
+                            k = k + 1
+                        Else
+                            data_ranked_sub_rank(j)(i) = extract_rank_composition(m)(dim_rank_rank_if_not_available)
                         End If
                         
-                    Next v
+                    End If
+                    
+                    
+'                    'ne retient que les tickers du sector
+'                    For v = 1 To UBound(extract_rank_ticker_and_sector, 1) 'boucle helper ticker + sector
+'
+''                        If extract_rank_ticker_and_sector(v)(0) > extract_data_for_ranking(j)(0) Then
+''                            Exit For
+''                        End If
+'
+'                        If extract_rank_ticker_and_sector(v)(0) = extract_data_for_ranking(j)(0) Then 'match ticker
+'
+'                            If extract_rank_ticker_and_sector(v)(1) = extract_rank_distinct_sector(u)(0) Then 'match sector
+'
+'                                If IsNull(extract_data_for_ranking(j)(i)) = False Then
+'                                    ReDim Preserve tmp_column(k)
+'                                    tmp_column(k) = extract_data_for_ranking(j)(i)
+'                                    k = k + 1
+'                                Else
+'                                    data_ranked_sub_rank(j)(i) = extract_rank_composition(m)(dim_rank_rank_if_not_available)
+'                                End If
+'                            Else
+'                                Exit For
+'                            End If
+'
+'                            Exit For
+'                        End If
+'
+'                    Next v
                     
                 Next j
                 
@@ -1138,6 +1339,7 @@ For u = 1 To UBound(extract_rank_distinct_sector, 1) 'boucle sur sector
                         For p = 0 To UBound(tmp_column, 1)
                             If extract_data_for_ranking(j)(i) = tmp_column(p) Then
                                 data_ranked_sub_rank(j)(i) = p * (100 / (UBound(tmp_column, 1)))
+                                
                                 'pas d exit for si meme donnee plus loin
                             End If
                         Next p
